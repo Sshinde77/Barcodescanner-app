@@ -26,12 +26,13 @@ class AppCard extends StatelessWidget {
         color: gradient == null ? Theme.of(context).cardColor : null,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: borderColor ?? Theme.of(context).dividerColor.withOpacity(0.5),
+          color: borderColor ??
+              Theme.of(context).dividerColor.withValues(alpha: 0.5),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(
-              Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.06,
+            color: Colors.black.withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.06,
             ),
             blurRadius: 24,
             offset: const Offset(0, 10),

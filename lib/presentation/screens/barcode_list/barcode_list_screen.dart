@@ -4,11 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/mock/mock_barcodes.dart';
 import '../../widgets/admin_shell.dart';
-import '../../widgets/app_card.dart';
 import '../../widgets/barcode_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/empty_state_widget.dart';
-import '../../widgets/shimmer_loader.dart';
 
 class BarcodeListScreen extends StatefulWidget {
   const BarcodeListScreen({super.key});
@@ -72,6 +70,11 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
     return AdminShell(
       title: 'Barcode List',
       selectedPath: '/barcode-list',
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.go('/generate-barcode'),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Generate New Barcode'),
+      ),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -121,17 +124,13 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
                   itemBuilder: (context, index) {
                     final item = filtered[index];
                     return BarcodeCard(
-                          item: item,
-                          onView: () =>
-                              context.go('/barcode-detail/${item.id}'),
-                          onEdit: () =>
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Edit is mock-only'),
-                                ),
-                              ),
-                          onDelete: () => _confirmDelete(item),
-                        )
+                      item: item,
+                      onView: () => context.go('/barcode-detail/${item.id}'),
+                      onEdit: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Edit is mock-only')),
+                      ),
+                      onDelete: () => _confirmDelete(item),
+                    )
                         .animate()
                         .fadeIn(delay: (index * 70).ms)
                         .slideY(begin: 0.04, end: 0);
@@ -148,11 +147,6 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
             const SizedBox(height: 80),
           ],
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/generate-barcode'),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Generate New Barcode'),
       ),
     );
   }

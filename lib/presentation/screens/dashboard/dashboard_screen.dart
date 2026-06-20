@@ -64,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         'Manage scans and barcode inventory from one place.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
                     ],
@@ -141,7 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: mockBarcodes.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final item = mockBarcodes[index];
                 return AppCard(

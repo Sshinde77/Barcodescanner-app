@@ -28,7 +28,7 @@ class EmptyStateWidget extends StatelessWidget {
             height: 180,
             child: Lottie.asset(
               AppAssets.emptyStateAnimation,
-              errorBuilder: (_, __, ___) => Icon(
+              errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.inbox_outlined,
                 size: 96,
                 color: Theme.of(context).colorScheme.primary,

@@ -64,4 +64,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/lottie/qrscanner.json
-    - assets/images/
+    - assets/images/camera.png
+    - assets/images/file.png
+  
+    - assets/images/keyboard1.png
+    - assets/lottie/search.json
+
+

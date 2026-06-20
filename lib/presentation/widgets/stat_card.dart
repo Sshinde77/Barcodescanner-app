@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import 'app_card.dart';
 
@@ -29,7 +28,7 @@ class StatCard extends StatelessWidget {
             height: 52,
             width: 52,
             decoration: BoxDecoration(
-              color: tint.withOpacity(0.14),
+              color: tint.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: tint),

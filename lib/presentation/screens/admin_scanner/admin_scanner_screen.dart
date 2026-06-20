@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../../core/constants/app_assets.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
@@ -37,7 +36,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
             Lottie.asset(
               AppAssets.successAnimation,
               height: 140,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (context, error, stackTrace) =>
                   const Icon(Icons.verified_rounded, size: 72),
             ),
             const SizedBox(height: 12),
@@ -71,10 +70,10 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                             colors: [
                               Theme.of(
                                 context,
-                              ).colorScheme.primary.withOpacity(0.10),
+                              ).colorScheme.primary.withValues(alpha: 0.10),
                               Theme.of(
                                 context,
-                              ).colorScheme.secondary.withOpacity(0.10),
+                              ).colorScheme.secondary.withValues(alpha: 0.10),
                             ],
                           ),
                         ),
@@ -88,7 +87,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                             'assets/lottie/qrscanner.json',
                             fit: BoxFit.contain,
                             repeat: true,
-                            errorBuilder: (_, __, ___) => Icon(
+                            errorBuilder: (context, error, stackTrace) => Icon(
                               Icons.document_scanner_rounded,
                               size: 96,
                               color: Theme.of(context).colorScheme.primary,
@@ -102,7 +101,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                 const SizedBox(height: 14),
                 CustomButton(
                   label: 'Scan Barcode',
-                  icon: Icons.camera_alt_rounded,
+                  iconAssetPath: 'assets/images/camera.png',
                   onPressed: _showResult,
                 ),
               ],
@@ -116,7 +115,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                   child: CustomTextField(
                     controller: _controller,
                     label: 'Manual scan input',
-                    prefixIcon: Icons.confirmation_number_rounded,
+                    prefixAssetPath: 'assets/images/keyboard1.png',
                   ),
                 ),
                 const SizedBox(width: 10),

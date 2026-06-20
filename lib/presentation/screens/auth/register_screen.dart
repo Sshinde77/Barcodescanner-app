@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';

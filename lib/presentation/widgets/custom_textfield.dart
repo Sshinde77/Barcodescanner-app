@@ -7,6 +7,7 @@ class CustomTextField extends StatefulWidget {
     this.label,
     this.hint,
     this.prefixIcon,
+    this.prefixAssetPath,
     this.suffixIcon,
     this.onSuffixTap,
     this.obscureText = false,
@@ -21,6 +22,7 @@ class CustomTextField extends StatefulWidget {
   final String? label;
   final String? hint;
   final IconData? prefixIcon;
+  final String? prefixAssetPath;
   final IconData? suffixIcon;
   final VoidCallback? onSuffixTap;
   final bool obscureText;
@@ -50,7 +52,20 @@ class _CustomTextFieldState extends State<CustomTextField> {
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hint,
-        prefixIcon: widget.prefixIcon == null ? null : Icon(widget.prefixIcon),
+        prefixIcon: widget.prefixAssetPath != null
+            ? Padding(
+                padding: const EdgeInsets.all(12),
+                child: Image.asset(
+                  widget.prefixAssetPath!,
+                  width: 42,
+                  height: 42,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              )
+            : widget.prefixIcon == null
+                ? null
+                : Icon(widget.prefixIcon),
         suffixIcon: widget.obscureText
             ? IconButton(
                 icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),

@@ -1,4 +1,3 @@
-import 'package:barcode/barcode.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -134,7 +133,7 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.16),
+                  color: AppColors.warning.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Icon(Icons.close_rounded),

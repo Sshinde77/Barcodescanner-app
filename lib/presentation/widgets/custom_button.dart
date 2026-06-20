@@ -11,6 +11,8 @@ class CustomButton extends StatelessWidget {
     required this.onPressed,
     this.variant = CustomButtonVariant.primary,
     this.icon,
+    this.iconAssetPath,
+    this.iconColor,
     this.loading = false,
     this.fullWidth = true,
   });
@@ -19,6 +21,8 @@ class CustomButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final CustomButtonVariant variant;
   final IconData? icon;
+  final String? iconAssetPath;
+  final Color? iconColor;
   final bool loading;
   final bool fullWidth;
 
@@ -29,8 +33,8 @@ class CustomButton extends StatelessWidget {
       child: loading
           ? SizedBox(
               key: const ValueKey('loading'),
-              height: 20,
-              width: 20,
+              height: 40,
+              width: 40,
               child: CircularProgressIndicator(
                 strokeWidth: 2.4,
                 color: variant == CustomButtonVariant.primary
@@ -45,6 +49,17 @@ class CustomButton extends StatelessWidget {
               children: [
                 if (icon != null) ...[
                   Icon(icon, size: 18),
+                  const SizedBox(width: 8),
+                ] else if (iconAssetPath != null) ...[
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Image.asset(
+                      iconAssetPath!,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                 ],
                 Text(label),

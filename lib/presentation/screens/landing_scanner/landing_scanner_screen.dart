@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 
-import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../data/mock/mock_scan_history.dart';
@@ -60,9 +59,10 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           children: [
             Text(
               'Scan Result',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 12),
             AppCard(
@@ -72,8 +72,8 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                   Text(
                     product,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                   const SizedBox(height: 6),
                   Text(code),
@@ -174,16 +174,16 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                   Text(
                     'Scan, preview, and manage barcodes',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Public scanner with local mock result cards and scan history.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withOpacity(0.9),
-                    ),
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
                   ),
                 ],
               ),
@@ -203,12 +203,14 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                             borderRadius: BorderRadius.circular(28),
                             gradient: LinearGradient(
                               colors: [
-                                Theme.of(
-                                  context,
-                                ).colorScheme.primary.withOpacity(0.12),
-                                Theme.of(
-                                  context,
-                                ).colorScheme.secondary.withOpacity(0.10),
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.12),
+                                Theme.of(context)
+                                    .colorScheme
+                                    .secondary
+                                    .withValues(alpha: 0.10),
                               ],
                             ),
                           ),
@@ -216,19 +218,16 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                         SizedBox(
                           width: 330,
                           height: 330,
-                          child: Padding(
-                            padding: EdgeInsets.zero,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: Lottie.asset(
-                                'assets/lottie/qrscanner.json',
-                                fit: BoxFit.contain,
-                                repeat: true,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.document_scanner_rounded,
-                                  size: 112,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Lottie.asset(
+                              'assets/lottie/qrscanner.json',
+                              fit: BoxFit.contain,
+                              repeat: true,
+                              errorBuilder: (context, error, stackTrace) => Icon(
+                                Icons.document_scanner_rounded,
+                                size: 112,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
                           ),
@@ -242,14 +241,14 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                   const SizedBox(height: 14),
                   CustomButton(
                     label: 'Scan Barcode',
-                    icon: Icons.camera_alt_rounded,
+                    iconAssetPath: 'assets/images/camera.png',
                     loading: _loadingScan,
                     onPressed: _fakeScan,
                   ),
                   const SizedBox(height: 10),
                   CustomButton(
                     label: 'Upload Image to Scan',
-                    icon: Icons.upload_rounded,
+                    iconAssetPath: 'assets/images/file.png',
                     variant: CustomButtonVariant.outline,
                     onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Upload flow is UI only')),
@@ -267,13 +266,23 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                       controller: _manualController,
                       label: 'Manual barcode input',
                       hint: 'Enter barcode manually',
-                      prefixIcon: Icons.confirmation_number_rounded,
+                      prefixAssetPath: 'assets/images/keyboard1.png',
                     ),
                   ),
                   const SizedBox(width: 10),
                   IconButton.filled(
                     onPressed: _manualSearch,
-                    icon: const Icon(Icons.search_rounded),
+                    icon: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Lottie.asset(
+                        'assets/lottie/search.json',
+                        fit: BoxFit.contain,
+                        repeat: true,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.search_rounded),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -281,9 +290,10 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
             const SizedBox(height: 20),
             Text(
               'Scan History',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 12),
             if (_history.isEmpty)
@@ -296,9 +306,10 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                 ),
               )
             else
-              ..._history.asMap().entries.map(
-                (entry) => Dismissible(
-                  key: ValueKey(entry.value.id),
+              ..._history.asMap().entries.map((entry) {
+                final item = entry.value;
+                return Dismissible(
+                  key: ValueKey(item.id),
                   direction: DismissDirection.endToStart,
                   onDismissed: (_) {
                     setState(() => _history.removeAt(entry.key));
@@ -311,7 +322,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     decoration: BoxDecoration(
-                      color: AppColors.danger.withOpacity(0.12),
+                      color: AppColors.danger.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Icon(
@@ -327,9 +338,10 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                           height: 52,
                           width: 52,
                           decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withOpacity(0.10),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Icon(Icons.receipt_long_rounded),
@@ -340,20 +352,24 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                entry.value.title,
-                                style: Theme.of(context).textTheme.titleMedium
+                                item.title,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(height: 3),
-                              Text(entry.value.subtitle),
+                              Text(item.subtitle),
                               const SizedBox(height: 6),
                               Text(
-                                '${entry.value.code} � ${entry.value.time}',
-                                style: Theme.of(context).textTheme.bodySmall
+                                '${item.code} - ${item.time}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
                                     ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                               ),
                             ],
@@ -361,9 +377,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                         ),
                         IconButton(
                           onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: entry.value.code),
-                            );
+                            Clipboard.setData(ClipboardData(text: item.code));
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Code copied')),
                             );
@@ -373,8 +387,8 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                       ],
                     ),
                   ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.06, end: 0),
-                ),
-              ),
+                );
+              }),
           ],
         ),
       ),

@@ -52,7 +52,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             height: 180,
                             child: Lottie.asset(
                               AppAssets.successAnimation,
-                              errorBuilder: (_, __, ___) => Icon(
+                              errorBuilder: (context, error, stackTrace) => Icon(
                                 Icons.mark_email_read_rounded,
                                 size: 96,
                                 color: Theme.of(context).colorScheme.primary,
