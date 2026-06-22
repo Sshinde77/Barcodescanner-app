@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum BarcodeFormatOption { code128, qr, ean13, upc }
+enum BarcodeFormatOption { code128, qr, code39, ean13, upc }
 
 extension BarcodeFormatOptionX on BarcodeFormatOption {
   String get label {
@@ -9,6 +9,8 @@ extension BarcodeFormatOptionX on BarcodeFormatOption {
         return 'Code128';
       case BarcodeFormatOption.qr:
         return 'QR Code';
+      case BarcodeFormatOption.code39:
+        return 'Code39';
       case BarcodeFormatOption.ean13:
         return 'EAN13';
       case BarcodeFormatOption.upc:
@@ -22,6 +24,8 @@ extension BarcodeFormatOptionX on BarcodeFormatOption {
         return Icons.view_week_rounded;
       case BarcodeFormatOption.qr:
         return Icons.qr_code_2_rounded;
+      case BarcodeFormatOption.code39:
+        return Icons.view_week_rounded;
       case BarcodeFormatOption.ean13:
         return Icons.tune_rounded;
       case BarcodeFormatOption.upc:

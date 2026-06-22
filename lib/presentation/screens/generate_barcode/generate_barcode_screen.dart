@@ -1,9 +1,13 @@
+import 'package:barcode/barcode.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../data/api/api_models.dart';
+import '../../../data/api/api_provider.dart';
 import '../../../data/mock/mock_barcodes.dart';
 import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
@@ -22,8 +26,9 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     text: 'Premium Thermal Label Pack | SKU 7821',
   );
   BarcodeFormatOption _format = BarcodeFormatOption.code128;
-  bool _showDuplicateWarning = true;
-  bool _generated = false;
+  bool _showDuplicateWarning = false;
+  bool _loading = false;
+  BarcodeGenerateItem? _generatedResult;
 
   @override
   void dispose() {
@@ -31,14 +36,16 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     super.dispose();
   }
 
+  String get _payload => _controller.text.trim();
+
   String get _generatedCode {
     switch (_format) {
       case BarcodeFormatOption.code128:
         return 'SBM-${DateTime.now().year}-001';
       case BarcodeFormatOption.qr:
-        return _controller.text.trim().isEmpty
-            ? 'https://smartbarcode.local/mock'
-            : _controller.text.trim();
+        return _payload.isEmpty ? 'https://smartbarcode.local/mock' : _payload;
+      case BarcodeFormatOption.code39:
+        return _payload.isEmpty ? 'CODE39-SAMPLE' : _payload;
       case BarcodeFormatOption.ean13:
         return '8901234567895';
       case BarcodeFormatOption.upc:
@@ -52,6 +59,8 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
         return Barcode.code128();
       case BarcodeFormatOption.qr:
         return Barcode.qrCode();
+      case BarcodeFormatOption.code39:
+        return Barcode.code39();
       case BarcodeFormatOption.ean13:
         return Barcode.ean13();
       case BarcodeFormatOption.upc:
@@ -59,17 +68,72 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     }
   }
 
+  String _apiFormatValue(BarcodeFormatOption format) {
+    switch (format) {
+      case BarcodeFormatOption.code128:
+        return 'code128';
+      case BarcodeFormatOption.qr:
+        return 'qrcode';
+      case BarcodeFormatOption.code39:
+        return 'code39';
+      case BarcodeFormatOption.ean13:
+        return 'ean13';
+      case BarcodeFormatOption.upc:
+        return 'upc';
+    }
+  }
+
   Future<void> _generate() async {
-    setState(() => _generated = true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Barcode generated locally')));
+    if (_payload.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter barcode data first')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final api = ApiScope.of(context);
+      final duplicate = await api.checkDuplicate(_payload);
+      if (!mounted) return;
+
+      setState(() => _showDuplicateWarning = duplicate.exists);
+
+      final label = _payload;
+      final result = await api.generateBarcode(
+        barcodeData: _payload,
+        barcodeFormat: _apiFormatValue(_format),
+        customLabel: label,
+      );
+
+      if (!mounted) return;
+      setState(() => _generatedResult = result);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            duplicate.exists
+                ? 'Barcode generated. Duplicate data already exists.'
+                : 'Barcode generated successfully.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final previewSvg = _generatedResult?.barcodeSvg;
     return AdminShell(
       title: 'Generate Barcode',
       selectedPath: '/generate-barcode',
@@ -82,9 +146,9 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
               children: [
                 Text(
                   'Product Data',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
@@ -99,9 +163,9 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
           const SizedBox(height: 16),
           Text(
             'Barcode Format',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -121,6 +185,7 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
           CustomButton(
             label: 'Generate Barcode',
             icon: Icons.qr_code_2_rounded,
+            loading: _loading,
             onPressed: _generate,
           ),
           const SizedBox(height: 16),
@@ -146,7 +211,7 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Duplicate code warning enabled for demo state.',
+                        'Duplicate barcode data detected by the API.',
                       ),
                     ),
                   ],
@@ -160,36 +225,42 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: BarcodeWidget(
-                    barcode: _barcode,
-                    data: _generatedCode,
-                    width: 280,
-                    height: 120,
-                    drawText: false,
-                    errorBuilder: (_, error) => SizedBox(
-                      height: 120,
-                      child: Center(child: Text(error.toString())),
-                    ),
-                  ),
+                  child: previewSvg != null && previewSvg.isNotEmpty
+                      ? SvgPicture.string(
+                          previewSvg,
+                          width: 280,
+                          height: 120,
+                          fit: BoxFit.contain,
+                        )
+                      : BarcodeWidget(
+                          barcode: _barcode,
+                          data: _generatedCode,
+                          width: 280,
+                          height: 120,
+                          drawText: false,
+                          errorBuilder: (_, error) => SizedBox(
+                            height: 120,
+                            child: Center(child: Text(error.toString())),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _generatedCode,
+                  _generatedResult?.uniqueCode ?? _generatedCode,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                        fontWeight: FontWeight.w800,
+                      ),
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        'Live preview updates locally based on the selected format.',
+                        _generatedResult?.barcodeImageUrl ??
+                            'Live preview updates from the API and local format selection.',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
@@ -207,12 +278,12 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
             ),
           ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.04, end: 0),
           const SizedBox(height: 10),
-          if (_generated)
+          if (_generatedResult != null)
             Text(
-              'Generated status set locally. No persistence or backend calls are used.',
+              'Generated barcode via API.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
         ],
       ),

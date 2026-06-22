@@ -5,6 +5,7 @@ import 'package:smart_barcode_manager/presentation/screens/admin_scanner/admin_s
 import 'package:smart_barcode_manager/presentation/screens/auth/forgot_password_screen.dart';
 import 'package:smart_barcode_manager/presentation/screens/auth/login_screen.dart';
 import 'package:smart_barcode_manager/presentation/screens/auth/register_screen.dart';
+import 'package:smart_barcode_manager/presentation/screens/auth/reset_password_screen.dart';
 import 'package:smart_barcode_manager/presentation/screens/barcode_detail/barcode_detail_screen.dart';
 import 'package:smart_barcode_manager/presentation/screens/barcode_list/barcode_list_screen.dart';
 import 'package:smart_barcode_manager/presentation/screens/dashboard/dashboard_screen.dart';
@@ -25,6 +26,11 @@ class AppRouter {
         '/forgot-password',
         'forgot-password',
         const ForgotPasswordScreen(),
+      ),
+      _page(
+        '/reset-password',
+        'reset-password',
+        const ResetPasswordScreen(),
       ),
       _page('/dashboard', 'dashboard', const DashboardScreen()),
       _page(

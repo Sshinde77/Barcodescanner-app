@@ -33,12 +33,16 @@ dependencies:
 
   barcode: any
   barcode_widget: any
+  file_picker: any
   flutter_animate: any
   flutter_svg: any
   cupertino_icons: ^1.0.8
   google_fonts: any
   go_router: any
   lottie: any
+  mobile_scanner: any
+  http: any
+  permission_handler: any
   shimmer: any
 
 dev_dependencies:

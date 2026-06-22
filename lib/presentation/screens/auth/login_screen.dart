@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../data/api/api_provider.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
@@ -30,10 +31,23 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    context.go('/dashboard');
+    try {
+      final session = await ApiScope.of(context).login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      context.go(session.role == 'admin' ? '/dashboard' : '/landing');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override

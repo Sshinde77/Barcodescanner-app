@@ -3,42 +3,33 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/api/api_provider.dart';
+import '../../../data/api/api_models.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 
-class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  const ResetPasswordScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _tokenController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
-  double _strength = 0.1;
   bool _loading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _tokenController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
-  }
-
-  void _updateStrength(String value) {
-    var score = 0.15;
-    if (value.length >= 8) score += 0.25;
-    if (RegExp(r'[A-Z]').hasMatch(value)) score += 0.2;
-    if (RegExp(r'[0-9]').hasMatch(value)) score += 0.2;
-    if (RegExp(r'[^\w\s]').hasMatch(value)) score += 0.2;
-    setState(() => _strength = score.clamp(0.1, 1));
   }
 
   Future<void> _submit() async {
@@ -52,14 +43,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _loading = true);
     try {
-      await ApiScope.of(context).register(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        passwordConfirmation: _confirmController.text,
+      await ApiScope.of(context).resetPassword(
+        PasswordResetRequest(
+          token: _tokenController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          passwordConfirmation: _confirmController.text,
+        ),
       );
       if (!mounted) return;
-      context.go('/dashboard');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset successfully')),
+      );
+      context.go('/login');
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,6 +73,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -90,24 +87,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Create account',
+                      'Reset password',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Register a new account using the live API.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Use the token from the email reset link to set a new password.',
                     ),
                     const SizedBox(height: 18),
                     CustomTextField(
-                      controller: _nameController,
-                      label: 'Full name',
-                      prefixIcon: Icons.person_rounded,
+                      controller: _tokenController,
+                      label: 'Reset token',
+                      prefixIcon: Icons.vpn_key_rounded,
                       validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                          ? 'Enter your name'
+                          (value == null || value.isEmpty)
+                          ? 'Enter reset token'
                           : null,
                     ),
                     const SizedBox(height: 14),
@@ -123,23 +119,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 14),
                     CustomTextField(
                       controller: _passwordController,
-                      label: 'Password',
+                      label: 'New password',
                       prefixIcon: Icons.lock_rounded,
                       obscureText: true,
-                      onChanged: _updateStrength,
                       validator: (value) =>
                           (value == null || value.length < 6)
                           ? 'Enter at least 6 characters'
                           : null,
-                    ),
-                    const SizedBox(height: 10),
-                    LinearProgressIndicator(
-                      value: _strength,
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(999),
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
                     ),
                     const SizedBox(height: 14),
                     CustomTextField(
@@ -154,7 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 18),
                     CustomButton(
-                      label: 'Register',
+                      label: 'Reset Password',
                       loading: _loading,
                       onPressed: _submit,
                     ),
