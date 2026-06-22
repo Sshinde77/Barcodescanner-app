@@ -12,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../data/api/api_provider.dart';
 import '../../../data/mock/mock_scan_history.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
@@ -375,15 +376,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
         titleSpacing: AppSpacing.lg,
         title: Row(
           children: [
-            Container(
-              height: 38,
-              width: 38,
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.qr_code_rounded, color: Colors.white),
-            ),
+            const AppLogo(size: 38, ),
             const SizedBox(width: 10),
             const Expanded(child: Text('Smart Barcode Manager')),
           ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_logo.dart';
+
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key, required this.currentPath});
 
@@ -39,11 +41,8 @@ class CustomDrawer extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 26,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: const Icon(
-                      Icons.qr_code_rounded,
-                      color: Colors.white,
-                    ),
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    child: const AppLogo(size: 44, ),
                   ),
                   const SizedBox(height: 14),
                   Text(

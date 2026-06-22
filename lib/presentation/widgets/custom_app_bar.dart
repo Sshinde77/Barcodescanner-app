@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_logo.dart';
+
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({
     super.key,
@@ -21,7 +23,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               icon: const Icon(Icons.menu_rounded),
               onPressed: () => drawerKey?.currentState?.openDrawer(),
             ),
-      title: Text(title),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppLogo(size: 30, ),
+          const SizedBox(width: 10),
+          Flexible(child: Text(title)),
+        ],
+      ),
       actions: actions,
     );
   }
