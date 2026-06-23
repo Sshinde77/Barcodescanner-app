@@ -90,32 +90,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   }
 
   Future<bool> _requestImagePermission() async {
-    if (kIsWeb) {
-      return true;
-    }
-
-    final statuses = await Future.wait([
-      Permission.storage.request(),
-      Permission.photos.request(),
-    ]);
-
-    final granted = statuses.any(
-      (status) => status.isGranted || status.isLimited,
-    );
-    if (granted) {
-      return true;
-    }
-
-    if (!mounted) {
-      return false;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Storage permission is required to pick images.'),
-      ),
-    );
-    return false;
+    return true;
   }
 
   Future<void> _startCameraScan() async {
@@ -764,7 +739,14 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                                 .withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(Icons.receipt_long_rounded),
+                          child: Center(
+                            child: Lottie.asset(
+                              'assets/lottie/barcode.json',
+                              width: 30,
+                              height: 30,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(

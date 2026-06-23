@@ -69,13 +69,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/lottie/qrscanner.json
+    - assets/lottie/
     - assets/images/camera.png
     - assets/images/file.png
     - assets/images/logo.png
     - assets/images/logo2.png
     - assets/images/keyboard1.png
-    - assets/lottie/search.json
 
 
 
