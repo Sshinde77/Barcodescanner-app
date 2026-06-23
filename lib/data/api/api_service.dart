@@ -6,11 +6,7 @@ import '../../core/constants/api_constants.dart';
 import 'api_models.dart';
 
 class ApiException implements Exception {
-  const ApiException(
-    this.message, {
-    this.statusCode,
-    this.validationErrors,
-  });
+  const ApiException(this.message, {this.statusCode, this.validationErrors});
 
   final String message;
   final int? statusCode;
@@ -19,10 +15,7 @@ class ApiException implements Exception {
   @override
   String toString() => message;
 
-  factory ApiException.fromResponse(
-    int statusCode,
-    Map<String, dynamic> json,
-  ) {
+  factory ApiException.fromResponse(int statusCode, Map<String, dynamic> json) {
     final errorsJson = json['errors'];
     final validationErrors = <ApiValidationError>[];
     if (errorsJson is Map) {
@@ -61,10 +54,7 @@ class ApiService {
     };
   }
 
-  Uri _uri(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-  }) {
+  Uri _uri(String path, {Map<String, dynamic>? queryParameters}) {
     final normalizedQuery = <String, String>{};
     if (queryParameters != null) {
       queryParameters.forEach((key, value) {
@@ -94,6 +84,37 @@ class ApiService {
     if (body != null) {
       request.body = jsonEncode(body);
     }
+
+    final streamedResponse = await _client.send(request);
+    final response = await http.Response.fromStream(streamedResponse);
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+
+    throw ApiException.fromResponse(response.statusCode, decoded);
+  }
+
+  Future<Map<String, dynamic>> _sendMultipart(
+    String method,
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Map<String, String>? fields,
+    List<http.MultipartFile> files = const [],
+    String? token,
+  }) async {
+    final request = http.MultipartRequest(
+      method,
+      _uri(path, queryParameters: queryParameters),
+    );
+    request.headers.addAll(_headers(token: token, jsonBody: false));
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+    request.files.addAll(files);
 
     final streamedResponse = await _client.send(request);
     final response = await http.Response.fromStream(streamedResponse);
@@ -177,19 +198,41 @@ class ApiService {
   }
 
   Future<ScanResultData> scanBarcode({
-    required String uniqueCode,
+    String? uniqueCode,
+    List<int>? barcodeImageBytes,
+    String? barcodeImageName,
   }) async {
-    final json = await _sendJson(
-      'POST',
-      ApiConstants.scanBarcode,
-      body: {'unique_code': uniqueCode},
-    );
+    if ((uniqueCode == null || uniqueCode.isEmpty) &&
+        (barcodeImageBytes == null || barcodeImageBytes.isEmpty)) {
+      throw const ApiException('Provide a barcode value or an image to scan.');
+    }
+
+    final hasImage = barcodeImageBytes != null && barcodeImageBytes.isNotEmpty;
+    final json = hasImage
+        ? await _sendMultipart(
+            'POST',
+            ApiConstants.scanBarcode,
+            fields: {
+              if (uniqueCode != null && uniqueCode.isNotEmpty)
+                'unique_code': uniqueCode,
+            },
+            files: [
+              http.MultipartFile.fromBytes(
+                'barcode_image',
+                barcodeImageBytes!,
+                filename: barcodeImageName,
+              ),
+            ],
+          )
+        : await _sendJson(
+            'POST',
+            ApiConstants.scanBarcode,
+            body: {'unique_code': uniqueCode},
+          );
     return ScanResultData.fromJson(_unwrapData(json));
   }
 
-  Future<ScanResultData> scanBarcodeByCode({
-    required String uniqueCode,
-  }) async {
+  Future<ScanResultData> scanBarcodeByCode({required String uniqueCode}) async {
     final json = await _sendJson(
       'GET',
       '${ApiConstants.scanBarcode}/$uniqueCode',
@@ -206,10 +249,7 @@ class ApiService {
       'GET',
       ApiConstants.scanHistory,
       token: token,
-      queryParameters: {
-        'per_page': perPage,
-        if (page != null) 'page': page,
-      },
+      queryParameters: {'per_page': perPage, if (page != null) 'page': page},
     );
     return ScanHistoryPage.fromJson(_unwrapData(json));
   }
@@ -328,10 +368,7 @@ class ApiService {
       'GET',
       ApiConstants.dashboardRecentBarcodes,
       token: token,
-      queryParameters: {
-        'per_page': perPage,
-        if (page != null) 'page': page,
-      },
+      queryParameters: {'per_page': perPage, if (page != null) 'page': page},
     );
     return RecentBarcodesPage.fromJson(json);
   }

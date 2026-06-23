@@ -128,8 +128,16 @@ class ApiProvider extends ChangeNotifier {
     }
   }
 
-  Future<ScanResultData> scanBarcode(String uniqueCode) {
-    return _service.scanBarcode(uniqueCode: uniqueCode);
+  Future<ScanResultData> scanBarcode({
+    String? uniqueCode,
+    List<int>? barcodeImageBytes,
+    String? barcodeImageName,
+  }) {
+    return _service.scanBarcode(
+      uniqueCode: uniqueCode,
+      barcodeImageBytes: barcodeImageBytes,
+      barcodeImageName: barcodeImageName,
+    );
   }
 
   Future<ScanResultData> scanBarcodeByCode(String uniqueCode) {
@@ -138,7 +146,11 @@ class ApiProvider extends ChangeNotifier {
 
   Future<ScanHistoryPage> fetchScanHistory({int perPage = 15, int? page}) {
     final token = _requireToken();
-    return _service.fetchScanHistory(token: token, perPage: perPage, page: page);
+    return _service.fetchScanHistory(
+      token: token,
+      perPage: perPage,
+      page: page,
+    );
   }
 
   Future<BarcodeListResponse> fetchBarcodes({
@@ -207,7 +219,10 @@ class ApiProvider extends ChangeNotifier {
     return _service.fetchDashboardStats(token: token);
   }
 
-  Future<RecentBarcodesPage> fetchRecentBarcodes({int perPage = 10, int? page}) {
+  Future<RecentBarcodesPage> fetchRecentBarcodes({
+    int perPage = 10,
+    int? page,
+  }) {
     final token = _requireToken();
     return _service.fetchRecentBarcodes(
       token: token,
@@ -233,8 +248,7 @@ class ApiScope extends InheritedNotifier<ApiProvider> {
   }) : super(notifier: notifier, child: child);
 
   static ApiProvider of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<ApiScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<ApiScope>();
     assert(scope != null, 'ApiScope not found in widget tree');
     return scope!.notifier!;
   }

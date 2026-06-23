@@ -84,11 +84,11 @@ class PasswordResetRequest {
   final String passwordConfirmation;
 
   Map<String, dynamic> toJson() => {
-        'token': token,
-        'email': email,
-        'password': password,
-        'password_confirmation': passwordConfirmation,
-      };
+    'token': token,
+    'email': email,
+    'password': password,
+    'password_confirmation': passwordConfirmation,
+  };
 }
 
 class ScanProductSnapshot {
@@ -252,7 +252,11 @@ class ScanHistoryPage {
 }
 
 class BarcodeOwner {
-  const BarcodeOwner({required this.id, required this.name, required this.email});
+  const BarcodeOwner({
+    required this.id,
+    required this.name,
+    required this.email,
+  });
 
   final int? id;
   final String? name;
@@ -505,7 +509,10 @@ class BarcodeUpdateItem {
 }
 
 class BarcodeDuplicateCheckResult {
-  const BarcodeDuplicateCheckResult({required this.exists, required this.count});
+  const BarcodeDuplicateCheckResult({
+    required this.exists,
+    required this.count,
+  });
 
   final bool exists;
   final int count;

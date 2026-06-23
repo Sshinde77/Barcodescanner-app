@@ -5,6 +5,16 @@ class MockScanHistoryItem {
     required this.code,
     required this.time,
     required this.subtitle,
+    this.isValid,
+    this.barcodeFormat,
+    this.customLabel,
+    this.productName,
+    this.barcodeImageUrl,
+    this.scannedAt,
+    this.brand,
+    this.category,
+    this.unit,
+    this.stockQuantity,
   });
 
   final String id;
@@ -12,6 +22,16 @@ class MockScanHistoryItem {
   final String code;
   final String time;
   final String subtitle;
+  final bool? isValid;
+  final String? barcodeFormat;
+  final String? customLabel;
+  final String? productName;
+  final String? barcodeImageUrl;
+  final DateTime? scannedAt;
+  final String? brand;
+  final String? category;
+  final String? unit;
+  final int? stockQuantity;
 }
 
 const mockScanHistory = <MockScanHistoryItem>[

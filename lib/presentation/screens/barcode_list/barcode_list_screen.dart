@@ -61,9 +61,14 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
 
   MockBarcodeItem _toMockItem(BarcodeSummaryItem item) {
     return MockBarcodeItem(
-      id: item.id?.toString() ?? item.uniqueCode ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      apiId: item.id?.toString(),
+      id:
+          item.id?.toString() ??
+          item.uniqueCode ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
       code: item.uniqueCode ?? item.barcodeData ?? '',
-      productName: item.productName ?? item.customLabel ?? 'Barcode',
+      productName: item.customLabel ?? item.productName ?? 'Barcode',
+      customLabel: item.customLabel,
       format: _formatFromApi(item.barcodeFormat),
       createdAt: item.createdAt ?? '',
       status: 'Active',
@@ -116,9 +121,9 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
 
   Future<void> _loadMore() async {
     if (_items.length >= _recordsTotal) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No more barcodes to load')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No more barcodes to load')));
       return;
     }
 
@@ -126,6 +131,67 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
       _start += _length;
     });
     await _load(append: true);
+  }
+
+  Future<void> _editBarcode(MockBarcodeItem item) async {
+    final controller = TextEditingController(
+      text: item.customLabel ?? item.productName ?? item.code,
+    );
+    final barcodeId = item.apiId ?? item.id;
+    if (barcodeId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Barcode id is missing.')));
+      return;
+    }
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Custom Label'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Custom Label',
+            alignLabelWithHint: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.isEmpty) {
+      return;
+    }
+
+    try {
+      await ApiScope.of(
+        context,
+      ).updateBarcode(id: barcodeId, customLabel: result);
+      if (!mounted) return;
+      await _load();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Custom label updated successfully')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
   }
 
   void _confirmDelete(MockBarcodeItem item) {
@@ -143,9 +209,12 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ApiScope.of(context).deleteBarcode(item.id);
+                final barcodeId = item.apiId ?? item.id;
+                await ApiScope.of(context).deleteBarcode(barcodeId);
                 if (!mounted) return;
-                setState(() => _items.removeWhere((entry) => entry.id == item.id));
+                setState(
+                  () => _items.removeWhere((entry) => entry.id == item.id),
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Barcode deleted')),
                 );
@@ -169,6 +238,11 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isTiny = screenWidth <= 320;
+    final searchFontSize = isTiny ? 13.0 : 14.0;
+    final iconSize = isTiny ? 18.0 : 20.0;
+    final fabLabelSize = isTiny ? 12.0 : 14.0;
     final filtered = _items
         .where(
           (item) =>
@@ -186,8 +260,11 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
       selectedPath: '/barcode-list',
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/generate-barcode'),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Generate New Barcode'),
+        icon: Icon(Icons.add_rounded, size: isTiny ? 18 : 20),
+        label: Text(
+          isTiny ? 'Generate' : 'Generate New Barcode',
+          style: TextStyle(fontSize: fabLabelSize),
+        ),
       ),
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -198,16 +275,21 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
                 child: TextField(
                   controller: _searchController,
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
+                  style: TextStyle(fontSize: searchFontSize),
+                  decoration: InputDecoration(
                     hintText: 'Search barcodes',
-                    prefixIcon: Icon(Icons.search_rounded),
+                    prefixIcon: Icon(Icons.search_rounded, size: iconSize),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               IconButton.filledTonal(
                 onPressed: () => setState(() => _showEmpty = !_showEmpty),
-                icon: const Icon(Icons.filter_alt_rounded),
+                icon: Icon(Icons.filter_alt_rounded, size: iconSize),
               ),
             ],
           ),
@@ -238,30 +320,30 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final crossAxisCount = constraints.maxWidth > 760 ? 2 : 1;
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filtered.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: crossAxisCount == 1 ? 1.65 : 1.35,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemBuilder: (context, index) {
-                    final item = filtered[index];
-                    return BarcodeCard(
-                          item: item,
-                          onView: () => context.go('/barcode-detail/${item.id}'),
-                          onEdit: () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Edit is live on detail screen')),
-                          ),
-                          onDelete: () => _confirmDelete(item),
-                        )
-                        .animate()
-                        .fadeIn(delay: (index * 70).ms)
-                        .slideY(begin: 0.04, end: 0);
-                  },
+                final cardWidth = crossAxisCount == 2
+                    ? (constraints.maxWidth - 12) / 2
+                    : constraints.maxWidth;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final entry in filtered.asMap().entries)
+                      SizedBox(
+                        width: cardWidth,
+                        child:
+                            BarcodeCard(
+                                  item: entry.value,
+                                  onView: () => context.go(
+                                    '/barcode-detail/${entry.value.apiId ?? entry.value.id}',
+                                  ),
+                                  onEdit: () => _editBarcode(entry.value),
+                                  onDelete: () => _confirmDelete(entry.value),
+                                )
+                                .animate()
+                                .fadeIn(delay: (entry.key * 70).ms)
+                                .slideY(begin: 0.04, end: 0),
+                      ),
+                  ],
                 );
               },
             ),

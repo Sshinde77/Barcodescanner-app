@@ -56,7 +56,9 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
     });
 
     try {
-      final item = await ApiScope.of(context).fetchBarcodeDetail(widget.barcodeId);
+      final item = await ApiScope.of(
+        context,
+      ).fetchBarcodeDetail(widget.barcodeId);
       if (!mounted) return;
       setState(() => _item = item);
     } catch (error) {
@@ -73,25 +75,30 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
     final item = _item;
     if (item == null) return;
 
-    final controller = TextEditingController(text: item.customLabel ?? '');
+    final controller = TextEditingController(
+      text: item.customLabel ?? item.product?.name ?? item.uniqueCode ?? '',
+    );
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Update custom label'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Custom Label'),
         content: TextField(
           controller: controller,
+          maxLines: 4,
           decoration: const InputDecoration(
-            labelText: 'Custom label',
+            labelText: 'Custom Label',
+            alignLabelWithHint: true,
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Save Changes'),
           ),
         ],
       ),
@@ -101,19 +108,20 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
 
     setState(() => _saving = true);
     try {
-      await ApiScope.of(context).updateBarcode(
-        id: widget.barcodeId,
-        customLabel: result,
-      );
+      await ApiScope.of(
+        context,
+      ).updateBarcode(id: widget.barcodeId, customLabel: result);
       if (!mounted) return;
       await _load();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Barcode updated successfully')),
+        const SnackBar(content: Text('Custom label updated successfully')),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     } finally {
       if (mounted) {
@@ -130,7 +138,9 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete barcode?'),
-        content: Text('Delete ${item.uniqueCode ?? widget.barcodeId} from the API?'),
+        content: Text(
+          'Delete ${item.uniqueCode ?? widget.barcodeId} from the API?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -154,7 +164,9 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     } finally {
       if (mounted) {
@@ -189,27 +201,48 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
             AppCard(
               child: Column(
                 children: [
-                  if (item.barcodeSvg != null && item.barcodeSvg!.isNotEmpty)
-                    SvgPicture.string(
-                      item.barcodeSvg!,
-                      width: 320,
-                      height: 140,
-                    )
-                  else
-                    BarcodeWidget(
-                      barcode: _barcodeFromFormat(item.barcodeFormat),
-                      data: item.uniqueCode ?? '',
-                      width: 320,
-                      height: 140,
-                      drawText: false,
-                      errorBuilder: (_, error) => Text(error.toString()),
-                    ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final barcodeWidth = constraints.maxWidth.isFinite
+                          ? constraints.maxWidth
+                          : MediaQuery.sizeOf(context).width;
+                      return SizedBox(
+                        width: barcodeWidth,
+                        height: 140,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child:
+                              item.barcodeSvg != null &&
+                                  item.barcodeSvg!.isNotEmpty
+                              ? SvgPicture.string(
+                                  item.barcodeSvg!,
+                                  width: barcodeWidth,
+                                  height: 140,
+                                )
+                              : BarcodeWidget(
+                                  barcode: _barcodeFromFormat(
+                                    item.barcodeFormat,
+                                  ),
+                                  data: item.uniqueCode ?? '',
+                                  width: barcodeWidth,
+                                  height: 140,
+                                  drawText: false,
+                                  errorBuilder: (_, error) =>
+                                      Text(error.toString()),
+                                ),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 12),
                   Text(
-                    item.uniqueCode ?? widget.barcodeId,
+                    item.customLabel ??
+                        item.product?.name ??
+                        item.uniqueCode ??
+                        widget.barcodeId,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ],
               ),
@@ -218,15 +251,29 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
             AppCard(
               child: Column(
                 children: [
-                  _detailRow(context, 'Product Name', item.product?.name ?? '-'),
+                  _detailRow(
+                    context,
+                    'Product Name',
+                    item.product?.name ?? '-',
+                  ),
+                  const Divider(),
+                  _detailRow(context, 'Custom Label', item.customLabel ?? '-'),
                   const Divider(),
                   _detailRow(context, 'Code', item.uniqueCode ?? '-'),
                   const Divider(),
                   _detailRow(context, 'Format', item.barcodeFormat ?? '-'),
                   const Divider(),
-                  _detailRow(context, 'Created Date', item.createdAt?.toIso8601String() ?? '-'),
+                  _detailRow(
+                    context,
+                    'Created Date',
+                    item.createdAt?.toIso8601String() ?? '-',
+                  ),
                   const Divider(),
-                  _detailRow(context, 'Scan Count', item.scanCount?.toString() ?? '-'),
+                  _detailRow(
+                    context,
+                    'Scan Count',
+                    item.scanCount?.toString() ?? '-',
+                  ),
                 ],
               ),
             ),
@@ -264,9 +311,9 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
           child: Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -274,9 +321,9 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
       ],

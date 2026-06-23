@@ -94,16 +94,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         'Hello, ${currentUser?.name ?? 'Admin'}',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Manage scans and barcode inventory from one place.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
@@ -127,7 +120,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 18),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 700;
                 final stats = _stats;
                 final cards = [
                   StatCard(
@@ -137,37 +129,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     tint: AppColors.primary,
                   ),
                   StatCard(
-                    label: 'Recent Scans',
+                    label: 'Total Scans Today',
                     value: stats?.scansToday ?? 0,
                     icon: Icons.document_scanner_rounded,
                     tint: AppColors.secondary,
                   ),
                   StatCard(
+                    label: 'Unique Barcode Data',
+                    value: stats?.uniqueBarcodeData ?? 0,
+                    icon: Icons.inventory_2_outlined,
+                    tint: AppColors.warning,
+                  ),
+                  StatCard(
                     label: 'Active Users',
                     value: stats?.activeUsers ?? 0,
-                    icon: Icons.bolt_rounded,
+                    icon: Icons.group_rounded,
                     tint: AppColors.info,
                   ),
                 ];
-                if (isWide) {
-                  return Row(
-                    children: [
-                      Expanded(child: cards[0]),
-                      const SizedBox(width: 12),
-                      Expanded(child: cards[1]),
-                      const SizedBox(width: 12),
-                      Expanded(child: cards[2]),
-                    ],
-                  );
-                }
-                return Column(
-                  children: [
-                    cards[0],
-                    const SizedBox(height: 12),
-                    cards[1],
-                    const SizedBox(height: 12),
-                    cards[2],
-                  ],
+                return GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: constraints.maxWidth > 700 ? 2.8 : 2.15,
+                  children: cards,
                 );
               },
             ),
@@ -176,9 +163,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text(
                   'Recent Generated Barcodes',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const Spacer(),
                 TextButton(
@@ -242,19 +229,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            AppCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFDCFCE7),
-                  child: Icon(Icons.refresh_rounded, color: AppColors.success),
-                ),
-                title: const Text('Pull-to-refresh is enabled'),
-                subtitle: const Text(
-                  'The dashboard now loads live stats and recent barcodes from the API.',
-                ),
-              ),
-            ),
+            // AppCard(
+            //   child: ListTile(
+            //     contentPadding: EdgeInsets.zero,
+            //     leading: const CircleAvatar(
+            //       backgroundColor: Color(0xFFDCFCE7),
+            //       child: Icon(Icons.refresh_rounded, color: AppColors.success),
+            //     ),
+            //     title: const Text('Pull-to-refresh is enabled'),
+            //     subtitle: const Text(
+            //       'The dashboard now loads live stats and recent barcodes from the API.',
+            //     ),
+            //   ),
+            // ),
           ],
         ],
       ),

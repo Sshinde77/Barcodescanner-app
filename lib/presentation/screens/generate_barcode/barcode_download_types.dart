@@ -1,0 +1,1 @@
+enum BarcodeDownloadFormat { png, svg }

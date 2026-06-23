@@ -43,7 +43,9 @@ dependencies:
   mobile_scanner: any
   http: any
   permission_handler: any
+  shared_preferences: any
   shimmer: any
+  flutter_launcher_icons: any
 
 dev_dependencies:
   flutter_test:
@@ -67,7 +69,17 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/images/
-    - assets/lottie/
+    - assets/lottie/qrscanner.json
+    - assets/images/camera.png
+    - assets/images/file.png
+    - assets/images/logo.png
+    - assets/images/logo2.png
+    - assets/images/keyboard1.png
+    - assets/lottie/search.json
 
 
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo2.png"

@@ -27,11 +27,7 @@ class AppRouter {
         'forgot-password',
         const ForgotPasswordScreen(),
       ),
-      _page(
-        '/reset-password',
-        'reset-password',
-        const ResetPasswordScreen(),
-      ),
+      _page('/reset-password', 'reset-password', const ResetPasswordScreen()),
       _page('/dashboard', 'dashboard', const DashboardScreen()),
       _page(
         '/generate-barcode',

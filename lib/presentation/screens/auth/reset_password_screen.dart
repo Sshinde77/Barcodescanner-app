@@ -35,9 +35,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_passwordController.text != _confirmController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
       return;
     }
 
@@ -88,9 +88,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   children: [
                     Text(
                       'Reset password',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -101,8 +100,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       controller: _tokenController,
                       label: 'Reset token',
                       prefixIcon: Icons.vpn_key_rounded,
-                      validator: (value) =>
-                          (value == null || value.isEmpty)
+                      validator: (value) => (value == null || value.isEmpty)
                           ? 'Enter reset token'
                           : null,
                     ),
@@ -122,8 +120,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       label: 'New password',
                       prefixIcon: Icons.lock_rounded,
                       obscureText: true,
-                      validator: (value) =>
-                          (value == null || value.length < 6)
+                      validator: (value) => (value == null || value.length < 6)
                           ? 'Enter at least 6 characters'
                           : null,
                     ),
@@ -133,8 +130,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       label: 'Confirm password',
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: true,
-                      validator: (value) =>
-                          (value == null || value.isEmpty)
+                      validator: (value) => (value == null || value.isEmpty)
                           ? 'Confirm your password'
                           : null,
                     ),

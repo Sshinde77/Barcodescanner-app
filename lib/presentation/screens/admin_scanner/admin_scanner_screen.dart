@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,13 +8,17 @@ import 'package:lottie/lottie.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../../core/constants/app_assets.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../data/api/api_models.dart';
 import '../../../data/api/api_provider.dart';
+import '../../../data/cache/scan_history_cache.dart';
+import '../../../data/mock/mock_scan_history.dart';
 import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class AdminScannerScreen extends StatefulWidget {
   const AdminScannerScreen({super.key});
@@ -26,7 +32,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
-  final List<ScanHistorySnapshot> _history = [];
+  final List<MockScanHistoryItem> _history = [];
   bool _isScanning = false;
   bool _isRequestingCameraPermission = false;
   bool _isRequestingImagePermission = false;
@@ -49,12 +55,12 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
   Future<void> _loadHistory() async {
     setState(() => _loadingHistory = true);
     try {
-      final response = await ApiScope.of(context).fetchScanHistory(perPage: 10);
+      final history = await ScanHistoryCache.load();
       if (!mounted) return;
       setState(() {
         _history
           ..clear()
-          ..addAll(response.items);
+          ..addAll(history);
       });
     } catch (error) {
       if (!mounted) return;
@@ -165,27 +171,18 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
     }
 
     if (result == null || result.files.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No image selected.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No image selected.')));
       return;
     }
 
     final file = result.files.single;
     setState(() => _pickedImageName = file.name);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Selected image: ${file.name}')),
-    );
-  }
-
-  void _prependHistory(ScanHistorySnapshot item) {
-    setState(() {
-      _history.insert(0, item);
-      if (_history.length > 10) {
-        _history.removeRange(10, _history.length);
-      }
-    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Selected image: ${file.name}')));
   }
 
   void _handleBarcodeDetection(BarcodeCapture capture) {
@@ -203,27 +200,17 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
     }
 
     _stopCameraScan();
-    _processScannedCode(code);
+    _processScannedCode(code, source: 'Camera Scanner');
   }
 
-  Future<void> _processScannedCode(String code) async {
+  Future<void> _processScannedCode(
+    String code, {
+    required String source,
+  }) async {
     try {
-      final result = await ApiScope.of(context).scanBarcode(code);
+      final result = await ApiScope.of(context).scanBarcode(uniqueCode: code);
       if (!mounted) return;
-
-      _prependHistory(
-        ScanHistorySnapshot(
-          uniqueCode: result.uniqueCode,
-          scanResult: 'success',
-          createdAt: DateTime.now(),
-          productDataSnapshot: ScanProductDataSnapshot(
-            uniqueCode: result.uniqueCode,
-            barcodeFormat: result.barcodeFormat,
-            customLabel: result.customLabel,
-            product: result.product,
-          ),
-        ),
-      );
+      _addHistoryItem(code: code, result: result, source: source);
       _showResult(code: result.uniqueCode ?? code, result: result);
     } catch (error) {
       if (!mounted) return;
@@ -235,33 +222,217 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
     }
   }
 
-  void _showResult({
+  void _addHistoryItem({
+    required String code,
+    required ScanResultData result,
+    required String source,
+  }) {
+    final historyItem = MockScanHistoryItem(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: result.productName ?? result.customLabel ?? 'Scanned Barcode',
+      code: result.uniqueCode ?? code,
+      time: result.scannedAt?.toLocal().toString().split('.').first ??
+          DateTime.now().toLocal().toString().split('.').first,
+      subtitle: source,
+      isValid: result.valid,
+      barcodeFormat: result.barcodeFormat,
+      customLabel: result.customLabel,
+      productName: result.productName ?? result.product?.name,
+      barcodeImageUrl: result.barcodeImageUrl,
+      scannedAt: result.scannedAt,
+      brand: result.product?.brand,
+      category: result.product?.category,
+      unit: result.product?.unit,
+      stockQuantity: result.product?.stockQuantity,
+    );
+
+    setState(() {
+      _history.insert(0, historyItem);
+      if (_history.length > 10) {
+        _history.removeRange(10, _history.length);
+      }
+    });
+
+    unawaited(ScanHistoryCache.save(_history));
+  }
+
+  Map<String, String> _scanResultDetails(ScanResultData result) {
+    return {
+      'Status': result.valid ? 'Valid' : 'Invalid',
+      'Unique Code': result.uniqueCode ?? '-',
+      'Barcode Format': result.barcodeFormat ?? '-',
+      'Custom Label': result.customLabel ?? '-',
+      'Product Name': result.productName ?? result.product?.name ?? '-',
+      'Scanned At': result.scannedAt?.toLocal().toString().split('.').first ??
+          '-',
+      'Barcode Image URL': result.barcodeImageUrl ?? '-',
+      'SKU': result.product?.sku ?? '-',
+      'Brand': result.product?.brand ?? '-',
+      'Category': result.product?.category ?? '-',
+      'Unit': result.product?.unit ?? '-',
+      'Stock Quantity': result.product?.stockQuantity?.toString() ?? '-',
+    };
+  }
+
+  Map<String, String> _historyDetails(MockScanHistoryItem item) {
+    return {
+      'Status': item.isValid == null
+          ? '-'
+          : (item.isValid == true ? 'Valid' : 'Invalid'),
+      'Source': item.subtitle,
+      'Unique Code': item.code,
+      'Barcode Format': item.barcodeFormat ?? '-',
+      'Custom Label': item.customLabel ?? '-',
+      'Product Name': item.productName ?? '-',
+      'Scanned At': item.scannedAt == null
+          ? item.time
+          : item.scannedAt!.toLocal().toString().split('.').first,
+      'Barcode Image URL': item.barcodeImageUrl ?? '-',
+      'Brand': item.brand ?? '-',
+      'Category': item.category ?? '-',
+      'Unit': item.unit ?? '-',
+      'Stock Quantity': item.stockQuantity?.toString() ?? '-',
+    };
+  }
+
+  Widget _detailRow(BuildContext context, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showDetailsPopup({
+    required String title,
+    required String source,
+    required String code,
+    required Map<String, String> details,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(dialogContext).textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  source,
+                  style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      dialogContext,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: SelectableText(
+                    code,
+                    style: Theme.of(dialogContext).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                for (final entry in details.entries) ...[
+                  _detailRow(dialogContext, entry.key, entry.value),
+                  const SizedBox(height: 10),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomButton(
+                        label: 'Copy Code',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: code));
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            const SnackBar(content: Text('Code copied')),
+                          );
+                        },
+                        fullWidth: false,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CustomButton(
+                        label: 'Close',
+                        variant: CustomButtonVariant.outline,
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        fullWidth: false,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showResult({
     required String code,
     required ScanResultData result,
   }) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Lottie.asset(
-              AppAssets.successAnimation,
-              height: 140,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.verified_rounded, size: 72),
-            ),
-            const SizedBox(height: 12),
-            Text('Scanned code: $code'),
-            if (result.productName != null) ...[
-              const SizedBox(height: 6),
-              Text(result.productName!),
-            ],
-          ],
-        ),
-      ),
+    return _showDetailsPopup(
+      title: 'Scan Result',
+      source: 'API result',
+      code: code,
+      details: _scanResultDetails(result),
+    );
+  }
+
+  Future<void> _showHistoryDetails(MockScanHistoryItem item) {
+    return _showDetailsPopup(
+      title: 'Recent Scan',
+      source: item.subtitle,
+      code: item.code,
+      details: _historyDetails(item),
     );
   }
 
@@ -305,16 +476,25 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                   ),
                 )
               : SizedBox(
-                  width: 320,
-                  height: 320,
-                  child: Lottie.asset(
-                    'assets/lottie/qrscanner.json',
-                    fit: BoxFit.contain,
-                    repeat: true,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.document_scanner_rounded,
-                      size: 96,
-                      color: Theme.of(context).colorScheme.primary,
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        width: 240,
+                        height: 240,
+                        child: Lottie.asset(
+                          'assets/lottie/qrscanner.json',
+                          fit: BoxFit.contain,
+                          repeat: true,
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.document_scanner_rounded,
+                            size: 96,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -336,18 +516,36 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
     );
   }
 
-  String _historyLabel(ScanHistorySnapshot item) {
-    final snapshot = item.productDataSnapshot;
-    return snapshot?.customLabel ?? snapshot?.product?.name ?? item.uniqueCode ?? 'Scanned Barcode';
+  void _manualSearch() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter barcode data first'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    _processScannedCode(value, source: 'Manual Entry');
   }
 
-  String _historySubtitle(ScanHistorySnapshot item) {
-    final scanResult = item.scanResult ?? 'success';
-    final createdAt = item.createdAt;
-    if (createdAt == null) {
-      return scanResult;
+  String _historyLabel(MockScanHistoryItem item) {
+    if (item.title.isNotEmpty) {
+      return item.title;
     }
-    return '$scanResult - ${createdAt.toLocal().toString().split('.').first}';
+    return item.customLabel ?? item.productName ?? item.code;
+  }
+
+  String _historySubtitle(MockScanHistoryItem item) {
+    final scanResult = item.isValid == null
+        ? 'Scan'
+        : (item.isValid == true ? 'Valid scan' : 'Invalid scan');
+    final time = item.scannedAt == null
+        ? item.time
+        : item.scannedAt!.toLocal().toString().split('.').first;
+    return '$scanResult - ${item.subtitle} - $time';
   }
 
   @override
@@ -356,9 +554,36 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
       title: 'Admin Scanner',
       selectedPath: '/admin-scanner',
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           AppCard(
+            gradient: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkHeroGradient
+                : AppColors.primaryGradient,
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Scan, preview, and manage barcodes',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Admin scanner with live API results and recent scan history.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          AppCard(
+            padding: const EdgeInsets.all(14),
             child: Column(
               children: [
                 AspectRatio(
@@ -382,13 +607,10 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                 ),
                 if (_pickedImageName != null) ...[
                   const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Selected image: $_pickedImageName',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                  Text(
+                    'Selected image: $_pickedImageName',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -396,11 +618,63 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Recent Scans',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          AppCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: CustomTextField(
+                    controller: _controller,
+                    label: 'Manual barcode input',
+                    hint: 'Enter barcode manually',
+                    prefixAssetPath: 'assets/images/keyboard1.png',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  onPressed: _manualSearch,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 1.2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(54, 54),
+                  ),
+                  icon: SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: Transform.scale(
+                      scale: 5.35,
+                      child: Lottie.asset(
+                        'assets/lottie/search.json',
+                        fit: BoxFit.contain,
+                        repeat: true,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.search_rounded),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Builder(
+            builder: (context) {
+              final width = MediaQuery.sizeOf(context).width;
+              final titleSize = width < 360 ? 18.0 : 22.0;
+              return Text(
+                'Recent Scans',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: titleSize,
                   fontWeight: FontWeight.w800,
                 ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           if (_loadingHistory)
@@ -409,18 +683,18 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_history.isEmpty)
-            AppCard(
-              child: ListTile(
-                leading: const Icon(Icons.history_rounded),
-                title: const Text('No recent scans'),
-                subtitle: const Text(
-                  'Scanned barcodes will appear here after the first scan.',
-                ),
+            const Padding(
+              padding: EdgeInsets.only(top: 24),
+              child: EmptyStateWidget(
+                title: 'No scans yet',
+                message:
+                    'Your cached scan history will appear here after the first scan.',
               ),
             )
           else
             ..._history.map(
               (item) => AppCard(
+                onTap: () => _showHistoryDetails(item),
                 margin: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
@@ -428,10 +702,9 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                       height: 52,
                       width: 52,
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.10),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(Icons.receipt_long_rounded),
@@ -443,22 +716,19 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                         children: [
                           Text(
                             _historyLabel(item),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(height: 3),
                           Text(_historySubtitle(item)),
                           const SizedBox(height: 6),
                           Text(
-                            item.uniqueCode ?? '',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            item.code,
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                           ),
                         ],
@@ -467,7 +737,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                     IconButton(
                       onPressed: () {
                         Clipboard.setData(
-                          ClipboardData(text: item.uniqueCode ?? ''),
+                          ClipboardData(text: item.code),
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Code copied')),
@@ -479,40 +749,15 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: 16),
-          AppCard(
-            child: Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    controller: _controller,
-                    label: 'Manual scan input',
-                    prefixAssetPath: 'assets/images/keyboard1.png',
-                  ),
-                ),
-                const SizedBox(width: 10),
-                IconButton.filled(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _controller.text));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Manual input copied')),
-                    );
-                  },
-                  icon: const Icon(Icons.copy_rounded),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          AppCard(
-            child: ListTile(
-              leading: const Icon(Icons.info_outline_rounded),
-              title: const Text('Admin shell active'),
-              subtitle: const Text(
-                'This scanner lives inside the dashboard scaffold.',
-              ),
-            ),
-          ),
+          // AppCard(
+          //   child: ListTile(
+          //     leading: const Icon(Icons.info_outline_rounded),
+          //     title: const Text('Admin shell active'),
+          //     subtitle: const Text(
+          //       'This scanner lives inside the dashboard scaffold.',
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );

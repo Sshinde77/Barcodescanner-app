@@ -30,15 +30,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _send() async {
     setState(() => _loading = true);
     try {
-      await ApiScope.of(context).forgotPassword(
-        email: _controller.text.trim(),
-      );
+      await ApiScope.of(context).forgotPassword(email: _controller.text.trim());
       if (!mounted) return;
       setState(() => _sent = true);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     } finally {
       if (mounted) {

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +13,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../data/api/api_models.dart';
 import '../../../data/api/api_provider.dart';
+import '../../../data/cache/scan_history_cache.dart';
 import '../../../data/mock/mock_scan_history.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/app_card.dart';
@@ -30,17 +35,36 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
-  final List<MockScanHistoryItem> _history = List.of(mockScanHistory);
+  final List<MockScanHistoryItem> _history = [];
   bool _isScanning = false;
   bool _isRequestingCameraPermission = false;
   bool _isRequestingImagePermission = false;
   String? _pickedImageName;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_loadHistory());
+  }
+
+  @override
   void dispose() {
     _manualController.dispose();
     _scannerController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await ScanHistoryCache.load();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _history
+        ..clear()
+        ..addAll(history);
+    });
   }
 
   Future<bool> _requestCameraPermission() async {
@@ -131,6 +155,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
     final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
+      withData: true,
     );
 
     if (!mounted) {
@@ -147,15 +172,26 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
     final file = result.files.single;
     setState(() => _pickedImageName = file.name);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Selected image: ${file.name}')));
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected image could not be read.')),
+      );
+      return;
+    }
+
+    await _scanBarcode(
+      imageBytes: bytes,
+      imageName: file.name,
+      source: 'Image Upload',
+    );
   }
 
   void _addHistoryItem({
     required String code,
     required String title,
     required String subtitle,
+    required ScanResultData result,
   }) {
     setState(() {
       _history.insert(
@@ -164,14 +200,26 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           title: title,
           code: code,
-          time: 'Just now',
+          time: result.scannedAt?.toLocal().toString().split('.').first ??
+              'Just now',
           subtitle: subtitle,
+          isValid: result.valid,
+          barcodeFormat: result.barcodeFormat,
+          customLabel: result.customLabel,
+          productName: result.productName ?? result.product?.name,
+          barcodeImageUrl: result.barcodeImageUrl,
+          scannedAt: result.scannedAt,
+          brand: result.product?.brand,
+          category: result.product?.category,
+          unit: result.product?.unit,
+          stockQuantity: result.product?.stockQuantity,
         ),
       );
       if (_history.length > 10) {
         _history.removeRange(10, _history.length);
       }
     });
+    unawaited(ScanHistoryCache.save(_history));
   }
 
   void _handleBarcodeDetection(BarcodeCapture capture) {
@@ -188,90 +236,229 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
       return;
     }
 
-    _stopCameraScan();
-    _scanBarcode(code, source: 'Camera Scanner');
+    setState(() => _isScanning = false);
+    unawaited(_scannerController.stop());
+    _scanBarcode(code: code, source: 'Camera Scanner');
   }
 
-  void _showResultSheet({
-    required String code,
-    required String product,
-    required String location,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Scan Result',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+  String _formatDateTime(DateTime? value) {
+    if (value == null) {
+      return '-';
+    }
+
+    return value.toLocal().toString().split('.').first;
+  }
+
+  Widget _detailRow(BuildContext context, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 12),
-            AppCard(
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Map<String, String> _scanResultDetails({
+    required ScanResultData result,
+    required String source,
+  }) {
+    return {
+      'Status': result.valid ? 'Valid' : 'Invalid',
+      'Source': source,
+      'Unique Code': result.uniqueCode ?? '-',
+      'Barcode Format': result.barcodeFormat ?? '-',
+      'Custom Label': result.customLabel ?? '-',
+      'Product Name': result.productName ?? result.product?.name ?? '-',
+      'Scanned At': _formatDateTime(result.scannedAt),
+      'Barcode Image URL': result.barcodeImageUrl ?? '-',
+      'SKU': result.product?.sku ?? '-',
+      'Brand': result.product?.brand ?? '-',
+      'Category': result.product?.category ?? '-',
+      'Unit': result.product?.unit ?? '-',
+      'Stock Quantity': result.product?.stockQuantity?.toString() ?? '-',
+    };
+  }
+
+  Map<String, String> _historyDetails(MockScanHistoryItem item) {
+    return {
+      'Status': item.isValid == null
+          ? '-'
+          : (item.isValid == true ? 'Valid' : 'Invalid'),
+      'Source': item.subtitle,
+      'Unique Code': item.code,
+      'Barcode Format': item.barcodeFormat ?? '-',
+      'Custom Label': item.customLabel ?? '-',
+      'Product Name': item.productName ?? '-',
+      'Scanned At': item.scannedAt == null
+          ? item.time
+          : _formatDateTime(item.scannedAt),
+      'Barcode Image URL': item.barcodeImageUrl ?? '-',
+      'Brand': item.brand ?? '-',
+      'Category': item.category ?? '-',
+      'Unit': item.unit ?? '-',
+      'Stock Quantity': item.stockQuantity?.toString() ?? '-',
+    };
+  }
+
+  Future<void> _showDetailsPopup({
+    required String title,
+    required String code,
+    required String source,
+    required Map<String, String> details,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.transparent,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: AppCard(
+            padding: const EdgeInsets.all(18),
+            child: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(code),
-                  const SizedBox(height: 10),
-                  Text('Location: $location'),
-                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      IconButton(
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: code));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Code copied')),
-                          );
-                        },
-                        icon: const Icon(Icons.copy_rounded),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(dialogContext).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
                       ),
-                      const Spacer(),
-                      CustomButton(
-                        label: 'Open Detail',
-                        onPressed: () => context.go('/barcode-detail/001'),
-                        fullWidth: false,
+                      IconButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    source,
+                    style: Theme.of(dialogContext).textTheme.bodySmall
+                        ?.copyWith(
+                          color: Theme.of(
+                            dialogContext,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        dialogContext,
+                      ).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SelectableText(
+                      code,
+                      style: Theme.of(dialogContext).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  for (final entry in details.entries) ...[
+                    _detailRow(dialogContext, entry.key, entry.value),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomButton(
+                          label: 'Copy Code',
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: code));
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(content: Text('Code copied')),
+                            );
+                          },
+                          fullWidth: false,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: CustomButton(
+                          label: 'Close',
+                          variant: CustomButtonVariant.outline,
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          fullWidth: false,
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Future<void> _scanBarcode(String code, {required String source}) async {
+  Future<void> _scanBarcode({
+    String? code,
+    Uint8List? imageBytes,
+    String? imageName,
+    required String source,
+  }) async {
     try {
-      final result = await ApiScope.of(context).scanBarcode(code);
+      final result = await ApiScope.of(context).scanBarcode(
+        uniqueCode: code,
+        barcodeImageBytes: imageBytes,
+        barcodeImageName: imageName,
+      );
       if (!mounted) return;
 
+      final resolvedCode =
+          result.uniqueCode ?? code ?? imageName ?? 'Scanned Barcode';
+      final resolvedTitle =
+          result.productName ?? result.customLabel ?? 'Scanned Barcode';
+
       _addHistoryItem(
-        code: result.uniqueCode ?? code,
-        title: result.productName ?? result.customLabel ?? 'Scanned Barcode',
+        code: resolvedCode,
+        title: resolvedTitle,
         subtitle: source,
+        result: result,
       );
-      _showResultSheet(
-        code: result.uniqueCode ?? code,
-        product: result.productName ?? result.customLabel ?? 'Scanned Barcode',
-        location: source,
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        unawaited(
+          _showDetailsPopup(
+            title: 'Scan Result',
+            code: resolvedCode,
+            source: source,
+            details: _scanResultDetails(result: result, source: source),
+          ),
+        );
+      });
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -280,6 +467,15 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showHistoryDetails(MockScanHistoryItem item) async {
+    await _showDetailsPopup(
+      title: 'Recent Scan',
+      code: item.code,
+      source: item.subtitle,
+      details: _historyDetails(item),
+    );
   }
 
   Widget _buildScannerPreview(BuildContext context) {
@@ -322,16 +518,25 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                   ),
                 )
               : SizedBox(
-                  width: 320,
-                  height: 320,
-                  child: Lottie.asset(
-                    'assets/lottie/qrscanner.json',
-                    fit: BoxFit.contain,
-                    repeat: true,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.document_scanner_rounded,
-                      size: 112,
-                      color: Theme.of(context).colorScheme.primary,
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        width: 240,
+                        height: 240,
+                        child: Lottie.asset(
+                          'assets/lottie/qrscanner.json',
+                          fit: BoxFit.contain,
+                          repeat: true,
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.document_scanner_rounded,
+                            size: 96,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -356,17 +561,17 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
 
   void _manualSearch() {
     final value = _manualController.text.trim();
-    if (value.isEmpty || value.length < 4) {
+    if (value.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invalid barcode format'),
+          content: Text('Enter barcode data first'),
           backgroundColor: AppColors.danger,
         ),
       );
       return;
     }
 
-    _scanBarcode(value, source: 'Public Scanner');
+    _scanBarcode(code: value, source: 'Manual Entry');
   }
 
   @override
@@ -376,7 +581,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
         titleSpacing: AppSpacing.lg,
         title: Row(
           children: [
-            const AppLogo(size: 38, ),
+            const AppLogo(size: 38),
             const SizedBox(width: 10),
             const Expanded(child: Text('Smart Barcode Manager')),
           ],
@@ -414,7 +619,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Public scanner with local mock result cards and scan history.',
+                    'API-backed scan results with local scan history.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -528,6 +733,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                   direction: DismissDirection.endToStart,
                   onDismissed: (_) {
                     setState(() => _history.removeAt(entry.key));
+                    unawaited(ScanHistoryCache.save(_history));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('History item removed')),
                     );
@@ -545,69 +751,62 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                       color: AppColors.danger,
                     ),
                   ),
-                  child:
-                      AppCard(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  height: 52,
-                                  width: 52,
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary
-                                        .withValues(alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Icon(Icons.receipt_long_rounded),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.title,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(item.subtitle),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        '${item.code} - ${item.time}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onSurfaceVariant,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () {
-                                    Clipboard.setData(
-                                      ClipboardData(text: item.code),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Code copied'),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.copy_rounded),
-                                ),
-                              ],
-                            ),
-                          )
+                  child: AppCard(
+                    onTap: () => _showHistoryDetails(item),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 52,
+                          width: 52,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary
+                                .withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(item.subtitle),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${item.code} - ${item.time}',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: item.code),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Code copied')),
+                            );
+                          },
+                          icon: const Icon(Icons.copy_rounded),
+                        ),
+                      ],
+                    ),
+                  )
                           .animate()
                           .fadeIn(duration: 250.ms)
                           .slideX(begin: 0.06, end: 0),

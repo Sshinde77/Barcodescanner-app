@@ -44,9 +44,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_passwordController.text != _confirmController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
       return;
     }
 
@@ -91,9 +91,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   children: [
                     Text(
                       'Create account',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -127,8 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.lock_rounded,
                       obscureText: true,
                       onChanged: _updateStrength,
-                      validator: (value) =>
-                          (value == null || value.length < 6)
+                      validator: (value) => (value == null || value.length < 6)
                           ? 'Enter at least 6 characters'
                           : null,
                     ),
@@ -147,8 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       label: 'Confirm password',
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: true,
-                      validator: (value) =>
-                          (value == null || value.isEmpty)
+                      validator: (value) => (value == null || value.isEmpty)
                           ? 'Confirm your password'
                           : null,
                     ),

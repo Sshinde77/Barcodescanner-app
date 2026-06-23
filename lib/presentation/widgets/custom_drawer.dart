@@ -42,7 +42,7 @@ class CustomDrawer extends StatelessWidget {
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: Theme.of(context).colorScheme.surface,
-                    child: const AppLogo(size: 44, ),
+                    child: const AppLogo(size: 44),
                   ),
                   const SizedBox(height: 14),
                   Text(

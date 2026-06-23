@@ -13,6 +13,7 @@ import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import 'barcode_download.dart';
 
 class GenerateBarcodeScreen extends StatefulWidget {
   const GenerateBarcodeScreen({super.key});
@@ -22,9 +23,8 @@ class GenerateBarcodeScreen extends StatefulWidget {
 }
 
 class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
-  final _controller = TextEditingController(
-    text: 'Premium Thermal Label Pack | SKU 7821',
-  );
+  final _controller = TextEditingController();
+  final _labelController = TextEditingController();
   BarcodeFormatOption _format = BarcodeFormatOption.code128;
   bool _showDuplicateWarning = false;
   bool _loading = false;
@@ -33,10 +33,16 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _labelController.dispose();
     super.dispose();
   }
 
   String get _payload => _controller.text.trim();
+
+  String get _humanReadableLabel {
+    final value = _labelController.text.trim();
+    return value.isEmpty ? _payload : value;
+  }
 
   String get _generatedCode {
     switch (_format) {
@@ -85,9 +91,9 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
 
   Future<void> _generate() async {
     if (_payload.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter barcode data first')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter barcode data first')));
       return;
     }
 
@@ -99,7 +105,7 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
 
       setState(() => _showDuplicateWarning = duplicate.exists);
 
-      final label = _payload;
+      final label = _humanReadableLabel;
       final result = await api.generateBarcode(
         barcodeData: _payload,
         barcodeFormat: _apiFormatValue(_format),
@@ -131,6 +137,40 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     }
   }
 
+  Future<void> _downloadGeneratedBarcode({
+    required BarcodeDownloadFormat format,
+  }) async {
+    final result = _generatedResult;
+    if (result == null) {
+      return;
+    }
+
+    final success = switch (format) {
+      BarcodeDownloadFormat.png => await downloadBarcodePng(
+        base64Png: result.barcodeImageBase64,
+        filename: '${result.uniqueCode ?? 'barcode'}.png',
+      ),
+      BarcodeDownloadFormat.svg => await downloadBarcodeSvg(
+        svg: result.barcodeSvg,
+        filename: '${result.uniqueCode ?? 'barcode'}.svg',
+      ),
+    };
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Download started'
+              : 'Download unavailable for this barcode',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final previewSvg = _generatedResult?.barcodeSvg;
@@ -145,17 +185,23 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Product Data',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  'Barcode Content',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
                   controller: _controller,
-                  label: 'Product Data',
-                  hint: 'Enter product name, SKU, or encoded payload',
+                  label: 'Barcode Content',
+                  hint: 'Enter product name, SKU, description, or any text...',
                   maxLines: 4,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: _labelController,
+                  label: 'Human Readable Label (shown below barcode)',
+                  hint: 'e.g. PROD-001',
                 ),
               ],
             ),
@@ -163,9 +209,9 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
           const SizedBox(height: 16),
           Text(
             'Barcode Format',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -225,55 +271,97 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: previewSvg != null && previewSvg.isNotEmpty
-                      ? SvgPicture.string(
-                          previewSvg,
-                          width: 280,
-                          height: 120,
-                          fit: BoxFit.contain,
-                        )
-                      : BarcodeWidget(
-                          barcode: _barcode,
-                          data: _generatedCode,
-                          width: 280,
-                          height: 120,
-                          drawText: false,
-                          errorBuilder: (_, error) => SizedBox(
-                            height: 120,
-                            child: Center(child: Text(error.toString())),
-                          ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final maxWidth = constraints.maxWidth.isFinite
+                          ? constraints.maxWidth
+                          : MediaQuery.sizeOf(context).width;
+                      return SizedBox(
+                        width: maxWidth,
+                        height: 120,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: previewSvg != null && previewSvg.isNotEmpty
+                              ? SvgPicture.string(
+                                  previewSvg,
+                                  width: maxWidth,
+                                  height: 120,
+                                  fit: BoxFit.contain,
+                                )
+                              : BarcodeWidget(
+                                  barcode: _barcode,
+                                  data: _generatedCode,
+                                  width: maxWidth,
+                                  height: 120,
+                                  drawText: false,
+                                  errorBuilder: (_, error) => SizedBox(
+                                    height: 120,
+                                    child: Center(
+                                      child: Text(error.toString()),
+                                    ),
+                                  ),
+                                ),
                         ),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   _generatedResult?.uniqueCode ?? _generatedCode,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
+                if ((_generatedResult?.customLabel ?? _humanReadableLabel)
+                    .isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _generatedResult?.customLabel ?? _humanReadableLabel,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _generatedResult?.barcodeImageUrl ??
-                            'Live preview updates from the API and local format selection.',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                if (_generatedResult != null)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomButton(
+                          label: 'PNG',
+                          icon: Icons.image_outlined,
+                          variant: CustomButtonVariant.outline,
+                          onPressed: () => _downloadGeneratedBarcode(
+                            format: BarcodeDownloadFormat.png,
+                          ),
+                        ),
                       ),
-                    ),
-                    IconButton.filledTonal(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Downloaded')),
-                        );
-                      },
-                      icon: const Icon(Icons.download_rounded),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: CustomButton(
+                          label: 'SVG',
+                          icon: Icons.code_rounded,
+                          variant: CustomButtonVariant.outline,
+                          onPressed: () => _downloadGeneratedBarcode(
+                            format: BarcodeDownloadFormat.svg,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    'Live preview updates from the API and local format selection.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
               ],
             ),
           ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.04, end: 0),
@@ -282,8 +370,8 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
             Text(
               'Generated barcode via API.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
         ],
       ),
