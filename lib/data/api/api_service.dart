@@ -219,7 +219,7 @@ class ApiService {
             files: [
               http.MultipartFile.fromBytes(
                 'barcode_image',
-                barcodeImageBytes!,
+                barcodeImageBytes,
                 filename: barcodeImageName,
               ),
             ],

@@ -9,6 +9,7 @@ import '../../../data/api/api_provider.dart';
 import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/responsive_layout.dart';
 
 class BarcodeDetailScreen extends StatefulWidget {
   const BarcodeDetailScreen({super.key, required this.barcodeId});
@@ -182,7 +183,7 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
       title: 'Barcode Detail',
       selectedPath: '/barcode-list',
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.pagePadding(context),
         children: [
           if (_loading)
             const Padding(
@@ -278,25 +279,37 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomButton(
-                    label: 'Update',
-                    loading: _saving,
-                    onPressed: _updateLabel,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: CustomButton(
-                    label: 'Delete',
-                    loading: _saving,
-                    variant: CustomButtonVariant.outline,
-                    onPressed: _deleteBarcode,
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 360;
+                final updateButton = CustomButton(
+                  label: 'Update',
+                  loading: _saving,
+                  onPressed: _updateLabel,
+                );
+                final deleteButton = CustomButton(
+                  label: 'Delete',
+                  loading: _saving,
+                  variant: CustomButtonVariant.outline,
+                  onPressed: _deleteBarcode,
+                );
+                return stacked
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          updateButton,
+                          const SizedBox(height: 12),
+                          deleteButton,
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: updateButton),
+                          const SizedBox(width: 12),
+                          Expanded(child: deleteButton),
+                        ],
+                      );
+              },
             ),
           ],
         ],
@@ -321,6 +334,8 @@ class _BarcodeDetailScreenState extends State<BarcodeDetailScreen> {
           child: Text(
             value,
             textAlign: TextAlign.right,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),

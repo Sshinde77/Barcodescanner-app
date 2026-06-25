@@ -54,11 +54,11 @@ class _CustomTextFieldState extends State<CustomTextField> {
         hintText: widget.hint,
         prefixIcon: widget.prefixAssetPath != null
             ? Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 child: Image.asset(
                   widget.prefixAssetPath!,
-                  width: 42,
-                  height: 42,
+                  width: 24,
+                  height: 24,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),

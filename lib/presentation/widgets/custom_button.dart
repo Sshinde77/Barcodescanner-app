@@ -52,8 +52,8 @@ class CustomButton extends StatelessWidget {
                   const SizedBox(width: 8),
                 ] else if (iconAssetPath != null) ...[
                   SizedBox(
-                    width: 40,
-                    height: 40,
+                    width: 26,
+                    height: 26,
                     child: Image.asset(
                       iconAssetPath!,
                       fit: BoxFit.contain,
@@ -62,7 +62,12 @@ class CustomButton extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                Text(label),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
     );

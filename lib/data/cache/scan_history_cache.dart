@@ -44,7 +44,9 @@ class ScanHistoryCache {
               brand: item['brand']?.toString(),
               category: item['category']?.toString(),
               unit: item['unit']?.toString(),
-              stockQuantity: int.tryParse(item['stock_quantity']?.toString() ?? ''),
+              stockQuantity: int.tryParse(
+                item['stock_quantity']?.toString() ?? '',
+              ),
             ),
           )
           .toList();

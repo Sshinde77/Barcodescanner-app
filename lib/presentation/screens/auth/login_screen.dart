@@ -8,6 +8,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/responsive_layout.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -55,17 +56,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = AppResponsive.isCompact(context);
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: AppResponsive.pagePadding(context),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               children: [
                 Container(
-                  height: 72,
-                  width: 72,
+                  height: compact ? 64 : 72,
+                  width: compact ? 64 : 72,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
@@ -76,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  child: const AppLogo(size: 72),
+                  child: AppLogo(size: compact ? 64 : 72),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -121,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             CustomTextField(
                               controller: _passwordController,
                               label: 'Password',
-                              hint: '••••••••',
+                              hint: 'Enter your password',
                               prefixIcon: Icons.lock_rounded,
                               obscureText: true,
                               validator: (value) =>

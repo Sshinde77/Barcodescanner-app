@@ -19,6 +19,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/empty_state_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class AdminScannerScreen extends StatefulWidget {
   const AdminScannerScreen({super.key});
@@ -206,7 +207,8 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       title: result.productName ?? result.customLabel ?? 'Scanned Barcode',
       code: result.uniqueCode ?? code,
-      time: result.scannedAt?.toLocal().toString().split('.').first ??
+      time:
+          result.scannedAt?.toLocal().toString().split('.').first ??
           DateTime.now().toLocal().toString().split('.').first,
       subtitle: source,
       isValid: result.valid,
@@ -238,8 +240,8 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
       'Barcode Format': result.barcodeFormat ?? '-',
       'Custom Label': result.customLabel ?? '-',
       'Product Name': result.productName ?? result.product?.name ?? '-',
-      'Scanned At': result.scannedAt?.toLocal().toString().split('.').first ??
-          '-',
+      'Scanned At':
+          result.scannedAt?.toLocal().toString().split('.').first ?? '-',
       'Barcode Image URL': result.barcodeImageUrl ?? '-',
       'SKU': result.product?.sku ?? '-',
       'Brand': result.product?.brand ?? '-',
@@ -288,9 +290,11 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -357,30 +361,42 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                   _detailRow(dialogContext, entry.key, entry.value),
                   const SizedBox(height: 10),
                 ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: CustomButton(
-                        label: 'Copy Code',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: code));
-                          ScaffoldMessenger.of(dialogContext).showSnackBar(
-                            const SnackBar(content: Text('Code copied')),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 360;
+                    final copyButton = CustomButton(
+                      label: 'Copy Code',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: code));
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(content: Text('Code copied')),
+                        );
+                      },
+                      fullWidth: false,
+                    );
+                    final closeButton = CustomButton(
+                      label: 'Close',
+                      variant: CustomButtonVariant.outline,
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      fullWidth: false,
+                    );
+                    return stacked
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              copyButton,
+                              const SizedBox(height: 12),
+                              closeButton,
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(child: copyButton),
+                              const SizedBox(width: 12),
+                              Expanded(child: closeButton),
+                            ],
                           );
-                        },
-                        fullWidth: false,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: CustomButton(
-                        label: 'Close',
-                        variant: CustomButtonVariant.outline,
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        fullWidth: false,
-                      ),
-                    ),
-                  ],
+                  },
                 ),
               ],
             ),
@@ -529,7 +545,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
       title: 'Admin Scanner',
       selectedPath: '/admin-scanner',
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: AppResponsive.pagePadding(context, top: AppSpacing.lg),
         children: [
           AppCard(
             gradient: Theme.of(context).brightness == Brightness.dark
@@ -594,47 +610,51 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
           ),
           const SizedBox(height: 16),
           AppCard(
-            child: Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    controller: _controller,
-                    label: 'Manual barcode input',
-                    hint: 'Enter barcode manually',
-                    prefixAssetPath: 'assets/images/keyboard1.png',
-                  ),
-                ),
-                const SizedBox(width: 10),
-                IconButton(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final field = CustomTextField(
+                  controller: _controller,
+                  label: 'Manual barcode input',
+                  hint: 'Enter barcode manually',
+                  prefixAssetPath: 'assets/images/keyboard1.png',
+                );
+                final action = IconButton(
                   onPressed: _manualSearch,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 1.2,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 1.2,
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(54, 54),
                     ),
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(54, 54),
-                  ),
-                  icon: SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: Transform.scale(
-                      scale: 5.35,
-                      child: Lottie.asset(
-                        'assets/lottie/search.json',
-                        fit: BoxFit.contain,
-                        repeat: true,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.search_rounded),
+                    icon: SizedBox(
+                      width: 38,
+                      height: 38,
+                      child: Transform.scale(
+                        scale: 5.35,
+                        child: Lottie.asset(
+                          'assets/lottie/search.json',
+                          fit: BoxFit.contain,
+                          repeat: true,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.search_rounded),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                  );
+                return Row(
+                  children: [
+                    Expanded(child: field),
+                    const SizedBox(width: 8),
+                    action,
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 20),
@@ -718,9 +738,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                     ),
                     IconButton(
                       onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: item.code),
-                        );
+                        Clipboard.setData(ClipboardData(text: item.code));
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Code copied')),
                         );

@@ -6,6 +6,7 @@ import '../../../data/api/api_provider.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/responsive_layout.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -76,14 +77,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = AppResponsive.isCompact(context);
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: AppResponsive.pagePadding(context),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: AppCard(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(compact ? 16 : 20),
               child: Form(
                 key: _formKey,
                 child: Column(

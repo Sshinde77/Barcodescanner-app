@@ -10,6 +10,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/barcode_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/empty_state_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class BarcodeListScreen extends StatefulWidget {
   const BarcodeListScreen({super.key});
@@ -239,7 +240,7 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final isTiny = screenWidth <= 320;
+    final isTiny = screenWidth < 380;
     final searchFontSize = isTiny ? 13.0 : 14.0;
     final iconSize = isTiny ? 18.0 : 20.0;
     final fabLabelSize = isTiny ? 12.0 : 14.0;
@@ -267,31 +268,48 @@ class _BarcodeListScreenState extends State<BarcodeListScreen> {
         ),
       ),
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.pagePadding(context),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  style: TextStyle(fontSize: searchFontSize),
-                  decoration: InputDecoration(
-                    hintText: 'Search barcodes',
-                    prefixIcon: Icon(Icons.search_rounded, size: iconSize),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 360;
+              final searchField = TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(fontSize: searchFontSize),
+                decoration: InputDecoration(
+                  hintText: 'Search barcodes',
+                  prefixIcon: Icon(Icons.search_rounded, size: iconSize),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filledTonal(
+              );
+              final filterButton = IconButton.filledTonal(
                 onPressed: () => setState(() => _showEmpty = !_showEmpty),
                 icon: Icon(Icons.filter_alt_rounded, size: iconSize),
-              ),
-            ],
+              );
+              return stacked
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        searchField,
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: filterButton,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: searchField),
+                        const SizedBox(width: 10),
+                        filterButton,
+                      ],
+                    );
+            },
           ),
           const SizedBox(height: 12),
           if (_error != null)

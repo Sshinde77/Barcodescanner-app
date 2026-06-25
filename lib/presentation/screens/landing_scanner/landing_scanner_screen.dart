@@ -22,6 +22,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/empty_state_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class LandingScannerScreen extends StatefulWidget {
   const LandingScannerScreen({super.key});
@@ -175,7 +176,8 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           title: title,
           code: code,
-          time: result.scannedAt?.toLocal().toString().split('.').first ??
+          time:
+              result.scannedAt?.toLocal().toString().split('.').first ??
               'Just now',
           subtitle: subtitle,
           isValid: result.valid,
@@ -242,6 +244,8 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           child: Text(
             value,
             textAlign: TextAlign.right,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -361,30 +365,42 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                     _detailRow(dialogContext, entry.key, entry.value),
                     const SizedBox(height: 10),
                   ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomButton(
-                          label: 'Copy Code',
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: code));
-                            ScaffoldMessenger.of(dialogContext).showSnackBar(
-                              const SnackBar(content: Text('Code copied')),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked = constraints.maxWidth < 360;
+                      final copyButton = CustomButton(
+                        label: 'Copy Code',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: code));
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            const SnackBar(content: Text('Code copied')),
+                          );
+                        },
+                        fullWidth: false,
+                      );
+                      final closeButton = CustomButton(
+                        label: 'Close',
+                        variant: CustomButtonVariant.outline,
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        fullWidth: false,
+                      );
+                      return stacked
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                copyButton,
+                                const SizedBox(height: 12),
+                                closeButton,
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Expanded(child: copyButton),
+                                const SizedBox(width: 12),
+                                Expanded(child: closeButton),
+                              ],
                             );
-                          },
-                          fullWidth: false,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: CustomButton(
-                          label: 'Close',
-                          variant: CustomButtonVariant.outline,
-                          onPressed: () => Navigator.of(dialogContext).pop(),
-                          fullWidth: false,
-                        ),
-                      ),
-                    ],
+                    },
                   ),
                 ],
               ),
@@ -558,13 +574,31 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           children: [
             const AppLogo(size: 38),
             const SizedBox(width: 10),
-            const Expanded(child: Text('Smart Barcode Manager')),
+            const Expanded(
+              child: Text(
+                'Smart Barcode Manager',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => context.go('/login'),
-            child: const Text('Login to Dashboard'),
+          Builder(
+            builder: (context) {
+              final compact = AppResponsive.isCompact(context);
+              if (compact) {
+                return IconButton(
+                  onPressed: () => context.go('/login'),
+                  icon: const Icon(Icons.login_rounded),
+                  tooltip: 'Login to Dashboard',
+                );
+              }
+              return TextButton(
+                onPressed: () => context.go('/login'),
+                child: const Text('Login to Dashboard'),
+              );
+            },
           ),
           // TextButton(
           //   onPressed: () => context.go('/register'),
@@ -575,7 +609,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: AppResponsive.pagePadding(context, top: AppSpacing.lg),
           children: [
             AppCard(
               gradient: Theme.of(context).brightness == Brightness.dark
@@ -640,18 +674,15 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
             ),
             const SizedBox(height: 18),
             AppCard(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: CustomTextField(
-                      controller: _manualController,
-                      label: 'Manual barcode input',
-                      hint: 'Enter barcode manually',
-                      prefixAssetPath: 'assets/images/keyboard1.png',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final field = CustomTextField(
+                    controller: _manualController,
+                    label: 'Manual barcode input',
+                    hint: 'Enter barcode manually',
+                    prefixAssetPath: 'assets/images/keyboard1.png',
+                  );
+                  final action = IconButton(
                     onPressed: _manualSearch,
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.transparent,
@@ -679,8 +710,15 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  );
+                  return Row(
+                    children: [
+                      Expanded(child: field),
+                      const SizedBox(width: 8),
+                      action,
+                    ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 20),
@@ -726,69 +764,77 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                       color: AppColors.danger,
                     ),
                   ),
-                  child: AppCard(
-                    onTap: () => _showHistoryDetails(item),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          height: 52,
-                          width: 52,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary
-                                .withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Center(
-                            child: Lottie.asset(
-                              'assets/lottie/barcode.json',
-                              width: 30,
-                              height: 30,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(item.subtitle),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${item.code} - ${item.time}',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                  child:
+                      AppCard(
+                            onTap: () => _showHistoryDetails(item),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  height: 52,
+                                  width: 52,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary
+                                        .withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Center(
+                                    child: Lottie.asset(
+                                      'assets/lottie/barcode.json',
+                                      width: 30,
+                                      height: 30,
+                                      fit: BoxFit.contain,
                                     ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: item.code),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Code copied')),
-                            );
-                          },
-                          icon: const Icon(Icons.copy_rounded),
-                        ),
-                      ],
-                    ),
-                  )
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(item.subtitle),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        '${item.code} - ${item.time}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: item.code),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Code copied'),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.copy_rounded),
+                                ),
+                              ],
+                            ),
+                          )
                           .animate()
                           .fadeIn(duration: 250.ms)
                           .slideX(begin: 0.06, end: 0),

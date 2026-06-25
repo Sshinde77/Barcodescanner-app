@@ -8,6 +8,7 @@ import '../../../data/api/api_models.dart';
 import '../../../data/api/api_provider.dart';
 import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/responsive_layout.dart';
 import '../../widgets/stat_card.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -73,35 +74,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(width: 6),
       ],
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: AppResponsive.pagePadding(context, top: AppSpacing.lg),
         children: [
           AppCard(
             gradient: Theme.of(context).brightness == Brightness.dark
                 ? AppColors.darkHeroGradient
                 : AppColors.primaryGradient,
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  radius: 26,
-                  backgroundColor: Colors.white24,
-                  child: Icon(Icons.person_rounded, color: Colors.white),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hello, ${currentUser?.name ?? 'Admin'}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 340;
+                final greeting = Text(
+                  'Hello, ${currentUser?.name ?? 'Admin'}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
                   ),
-                ),
-              ],
+                  maxLines: stacked ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+
+                return stacked
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.white24,
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          greeting,
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.white24,
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(child: greeting),
+                        ],
+                      );
+              },
             ),
           ).animate().fadeIn(duration: 260.ms).slideY(begin: 0.05, end: 0),
           const SizedBox(height: 18),
@@ -121,6 +143,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final stats = _stats;
+                final crossAxisCount = AppResponsive.gridColumns(
+                  constraints.maxWidth,
+                );
+                final spacing = 12.0;
                 final cards = [
                   StatCard(
                     label: 'Total Barcodes Generated',
@@ -148,31 +174,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ];
                 return GridView.count(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: spacing,
+                  mainAxisSpacing: spacing,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: constraints.maxWidth > 700 ? 2.8 : 2.15,
+                  childAspectRatio: crossAxisCount == 1
+                      ? 3.4
+                      : crossAxisCount == 2
+                      ? constraints.maxWidth > 700
+                            ? 2.8
+                            : 2.15
+                      : 2.2,
                   children: cards,
                 );
               },
             ),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Text(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 360;
+                final title = Text(
                   'Recent Generated Barcodes',
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const Spacer(),
-                TextButton(
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                );
+                final action = TextButton(
                   onPressed: () => context.go('/barcode-list'),
                   child: const Text('View all'),
-                ),
-              ],
+                );
+                return stacked
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [title, action],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: title),
+                          action,
+                        ],
+                      );
+              },
             ),
             const SizedBox(height: 8),
             SizedBox(

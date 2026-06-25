@@ -13,6 +13,7 @@ import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/responsive_layout.dart';
 import 'barcode_download.dart';
 
 class GenerateBarcodeScreen extends StatefulWidget {
@@ -48,14 +49,16 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     switch (_format) {
       case BarcodeFormatOption.code128:
         return 'SBM-${DateTime.now().year}-001';
-      case BarcodeFormatOption.qr:
-        return _payload.isEmpty ? 'https://smartbarcode.local/mock' : _payload;
-      case BarcodeFormatOption.code39:
-        return _payload.isEmpty ? 'CODE39-SAMPLE' : _payload;
-      case BarcodeFormatOption.ean13:
-        return '8901234567895';
-      case BarcodeFormatOption.upc:
-        return '123456789012';
+      // case BarcodeFormatOption.qr:
+      //   return _payload.isEmpty ? 'https://smartbarcode.local/mock' : _payload;
+      // case BarcodeFormatOption.code39:
+      //   return _payload.isEmpty ? 'CODE39-SAMPLE' : _payload;
+      // case BarcodeFormatOption.ean13:
+      //   return '8901234567895';
+      // case BarcodeFormatOption.upc:
+      //   return '123456789012';
+      default:
+        return 'SBM-${DateTime.now().year}-001';
     }
   }
 
@@ -63,14 +66,16 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     switch (_format) {
       case BarcodeFormatOption.code128:
         return Barcode.code128();
-      case BarcodeFormatOption.qr:
-        return Barcode.qrCode();
-      case BarcodeFormatOption.code39:
-        return Barcode.code39();
-      case BarcodeFormatOption.ean13:
-        return Barcode.ean13();
-      case BarcodeFormatOption.upc:
-        return Barcode.upcA();
+      // case BarcodeFormatOption.qr:
+      //   return Barcode.qrCode();
+      // case BarcodeFormatOption.code39:
+      //   return Barcode.code39();
+      // case BarcodeFormatOption.ean13:
+      //   return Barcode.ean13();
+      // case BarcodeFormatOption.upc:
+      //   return Barcode.upcA();
+      default:
+        return Barcode.code128();
     }
   }
 
@@ -78,14 +83,16 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
     switch (format) {
       case BarcodeFormatOption.code128:
         return 'code128';
-      case BarcodeFormatOption.qr:
-        return 'qrcode';
-      case BarcodeFormatOption.code39:
-        return 'code39';
-      case BarcodeFormatOption.ean13:
-        return 'ean13';
-      case BarcodeFormatOption.upc:
-        return 'upc';
+      // case BarcodeFormatOption.qr:
+      //   return 'qrcode';
+      // case BarcodeFormatOption.code39:
+      //   return 'code39';
+      // case BarcodeFormatOption.ean13:
+      //   return 'ean13';
+      // case BarcodeFormatOption.upc:
+      //   return 'upc';
+      default:
+        return 'code128';
     }
   }
 
@@ -178,7 +185,7 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
       title: 'Generate Barcode',
       selectedPath: '/generate-barcode',
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: AppResponsive.pagePadding(context, top: AppSpacing.lg),
         children: [
           AppCard(
             child: Column(
@@ -217,15 +224,15 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: BarcodeFormatOption.values.map((option) {
-              final selected = _format == option;
-              return ChoiceChip(
-                selected: selected,
-                onSelected: (_) => setState(() => _format = option),
-                avatar: Icon(option.icon, size: 18),
-                label: Text(option.label),
-              );
-            }).toList(),
+            children: [
+              ChoiceChip(
+                selected: _format == BarcodeFormatOption.code128,
+                onSelected: (_) =>
+                    setState(() => _format = BarcodeFormatOption.code128),
+                avatar: Icon(BarcodeFormatOption.code128.icon, size: 18),
+                label: Text(BarcodeFormatOption.code128.label),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           CustomButton(
@@ -331,30 +338,42 @@ class _GenerateBarcodeScreenState extends State<GenerateBarcodeScreen> {
                 ],
                 const SizedBox(height: 10),
                 if (_generatedResult != null)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomButton(
-                          label: 'PNG',
-                          icon: Icons.image_outlined,
-                          variant: CustomButtonVariant.outline,
-                          onPressed: () => _downloadGeneratedBarcode(
-                            format: BarcodeDownloadFormat.png,
-                          ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked = constraints.maxWidth < 360;
+                      final pngButton = CustomButton(
+                        label: 'PNG',
+                        icon: Icons.image_outlined,
+                        variant: CustomButtonVariant.outline,
+                        onPressed: () => _downloadGeneratedBarcode(
+                          format: BarcodeDownloadFormat.png,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: CustomButton(
-                          label: 'SVG',
-                          icon: Icons.code_rounded,
-                          variant: CustomButtonVariant.outline,
-                          onPressed: () => _downloadGeneratedBarcode(
-                            format: BarcodeDownloadFormat.svg,
-                          ),
+                      );
+                      final svgButton = CustomButton(
+                        label: 'SVG',
+                        icon: Icons.code_rounded,
+                        variant: CustomButtonVariant.outline,
+                        onPressed: () => _downloadGeneratedBarcode(
+                          format: BarcodeDownloadFormat.svg,
                         ),
-                      ),
-                    ],
+                      );
+                      return stacked
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                pngButton,
+                                const SizedBox(height: 12),
+                                svgButton,
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Expanded(child: pngButton),
+                                const SizedBox(width: 12),
+                                Expanded(child: svgButton),
+                              ],
+                            );
+                    },
                   )
                 else
                   Text(

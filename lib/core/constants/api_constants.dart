@@ -1,6 +1,5 @@
 class ApiConstants {
-  static const String baseUrl =
-      'https://lightgoldenrodyellow-dugong-733121.hostingersite.com/api/v1';
+  static const String baseUrl = 'https://wpc.bar/api/v1';
 
   static const String authRegister = '/auth/register';
   static const String authLogin = '/auth/login';

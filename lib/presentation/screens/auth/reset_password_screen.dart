@@ -7,6 +7,7 @@ import '../../../data/api/api_models.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/responsive_layout.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -72,15 +73,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = AppResponsive.isCompact(context);
     return Scaffold(
       appBar: AppBar(),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: AppResponsive.pagePadding(context),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: AppCard(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(compact ? 16 : 20),
               child: Form(
                 key: _formKey,
                 child: Column(

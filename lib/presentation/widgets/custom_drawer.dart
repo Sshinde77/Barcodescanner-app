@@ -10,6 +10,9 @@ class CustomDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final drawerWidth = (MediaQuery.sizeOf(context).width * 0.92)
+        .clamp(256.0, 304.0)
+        .toDouble();
     final items = <_DrawerItem>[
       const _DrawerItem(Icons.dashboard_rounded, 'Dashboard', '/dashboard'),
       const _DrawerItem(
@@ -30,6 +33,7 @@ class CustomDrawer extends StatelessWidget {
     ];
 
     return Drawer(
+      width: drawerWidth,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,6 +54,8 @@ class CustomDrawer extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -127,7 +133,7 @@ class _DrawerTile extends StatelessWidget {
         selected: selected,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         leading: Icon(icon, color: color),
-        title: Text(label),
+        title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         onTap: onTap,
       ),
     );

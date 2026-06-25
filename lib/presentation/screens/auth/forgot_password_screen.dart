@@ -8,6 +8,7 @@ import '../../../data/api/api_provider.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/responsive_layout.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -49,15 +50,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = AppResponsive.isCompact(context);
     return Scaffold(
       appBar: AppBar(),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: AppResponsive.pagePadding(context),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
             child: AppCard(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(compact ? 16 : 20),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 child: _sent
@@ -66,7 +68,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           SizedBox(
-                            height: 180,
+                            height: compact ? 140 : 180,
                             child: Lottie.asset(
                               AppAssets.successAnimation,
                               errorBuilder: (context, error, stackTrace) =>
