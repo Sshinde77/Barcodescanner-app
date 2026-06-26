@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -409,6 +410,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           customLabel: result.customLabel,
           productName: result.productName ?? result.product?.name,
           barcodeImageUrl: result.barcodeImageUrl,
+          publicLink: result.publicLink ?? result.barcodeImageUrl,
           scannedAt: result.scannedAt,
           brand: result.product?.brand,
           category: result.product?.category,
@@ -455,6 +457,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   }
 
   Widget _detailRow(BuildContext context, String label, String value) {
+    final isLink = label == 'Public Link' && value.startsWith('http');
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -469,18 +472,54 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
         ),
         const SizedBox(width: 12),
         Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
+          child: isLink
+              ? Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => _openPublicLink(value),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      value,
+                      textAlign: TextAlign.right,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                )
+              : Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
         ),
       ],
     );
+  }
+
+  Future<void> _openPublicLink(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the public link.')),
+      );
+    }
   }
 
   Map<String, String> _scanResultDetails({
@@ -501,7 +540,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
       'Unique Code': item.code,
       'Barcode Format': item.barcodeFormat ?? '-',
       'Barcode Data': item.customLabel ?? '-',
-      'Public Link': item.barcodeImageUrl ?? '-',
+      'Public Link': item.publicLink ?? item.barcodeImageUrl ?? '-',
       'Product Name': item.productName ?? '-',
       'Scanned At': item.scannedAt == null ? item.time : _formatDateTime(item.scannedAt),
     };
