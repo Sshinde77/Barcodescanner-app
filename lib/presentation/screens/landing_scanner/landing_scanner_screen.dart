@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -15,8 +16,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../data/api/api_models.dart';
 import '../../../data/api/api_provider.dart';
+import '../../../data/api/api_service.dart';
 import '../../../data/cache/scan_history_cache.dart';
 import '../../../data/mock/mock_scan_history.dart';
+import '../shared/barcode_image_decoder.dart';
+import '../shared/barcode_path_exists_stub.dart'
+    if (dart.library.io) '../shared/barcode_path_exists_io.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
@@ -40,7 +45,13 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   bool _isScanning = false;
   bool _isRequestingCameraPermission = false;
   bool _isRequestingImagePermission = false;
+  bool _isScanningUploadedImage = false;
+  PlatformFile? _pickedImageFile;
   String? _pickedImageName;
+
+  void _log(String message) {
+    debugPrint('[LandingScanner] $message');
+  }
 
   @override
   void initState() {
@@ -95,50 +106,69 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   }
 
   Future<void> _startCameraScan() async {
+    _log('Camera scan button clicked');
     setState(() => _isRequestingCameraPermission = true);
+    _log('Requesting camera permission');
     final granted = await _requestCameraPermission();
+    _log('Camera permission result: $granted');
     if (!mounted) {
+      _log('Widget unmounted after camera permission request');
       return;
     }
     setState(() => _isRequestingCameraPermission = false);
     if (!granted) {
+      _log('Camera scan cancelled because permission was denied');
       return;
     }
 
+    _log('Starting camera scanner');
     setState(() => _isScanning = true);
     await _scannerController.start();
+    _log('Camera scanner started');
   }
 
   Future<void> _stopCameraScan() async {
+    _log('Camera stop button clicked');
     await _scannerController.stop();
+    _log('Camera scanner stopped');
     if (!mounted) {
+      _log('Widget unmounted after stopping camera scan');
       return;
     }
     setState(() => _isScanning = false);
   }
 
   Future<void> _pickBarcodeImage() async {
+    _log('Upload Image button clicked');
     setState(() => _isRequestingImagePermission = true);
+    _log('Requesting image permission');
     final granted = await _requestImagePermission();
+    _log('Image permission result: $granted');
     if (!mounted) {
+      _log('Widget unmounted after image permission request');
       return;
     }
     setState(() => _isRequestingImagePermission = false);
     if (!granted) {
+      _log('Image pick cancelled because permission was denied');
       return;
     }
 
+    _log('Opening file picker for uploaded barcode image');
     final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
       withData: true,
     );
+    _log('File picker returned: ${result == null ? 'null' : 'result'}');
 
     if (!mounted) {
+      _log('Widget unmounted after file picker returned');
       return;
     }
 
     if (result == null || result.files.isEmpty) {
+      _log('No image selected');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('No image selected.')));
@@ -146,20 +176,214 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
     }
 
     final file = result.files.single;
-    setState(() => _pickedImageName = file.name);
+    _log(
+      'Picked image file: name=${file.name}, size=${file.size}, hasBytes=${file.bytes != null}',
+    );
+    setState(() {
+      _pickedImageFile = file;
+      _pickedImageName = file.name;
+    });
+    _log('Uploaded image stored for scan button');
+  }
 
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
+  Future<void> _scanPickedBarcodeImage() async {
+    _log('Scan uploaded image button clicked');
+    final file = _pickedImageFile;
+    if (file == null || file.name.isEmpty) {
+      _log('Scan aborted because no uploaded image is selected');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick an image before scanning.')),
+      );
+      return;
+    }
+
+    _log('Reading bytes from uploaded image: ${file.name}');
+    final bytes = await file.xFile.readAsBytes();
+    _log('Read ${bytes.length} bytes from uploaded image');
+    final imageName = _pickedImageName ?? file.name;
+    final decodedCode = await _decodeBarcodeFromUploadedImage(file, bytes);
+    _log('Decoded barcode from uploaded image: ${decodedCode ?? '-'}');
+    if (bytes.isEmpty || imageName.isEmpty) {
+      _log('Scan aborted because uploaded image bytes are empty or name missing');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selected image could not be read.')),
       );
       return;
     }
 
-    await _scanBarcode(
-      imageBytes: bytes,
-      imageName: file.name,
-      source: 'Image Upload',
+    if (decodedCode == null || decodedCode.isEmpty) {
+      _log('Scan aborted because no barcode was detected in the uploaded image');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No barcode found in the uploaded image.')),
+      );
+      return;
+    }
+
+    _log('Sending uploaded image to API: code=$decodedCode, name=$imageName');
+    setState(() => _isScanningUploadedImage = true);
+    try {
+      await _scanBarcode(
+        code: decodedCode,
+        imageBytes: bytes,
+        imageName: imageName,
+        source: 'Image Upload',
+      );
+      _log('Uploaded image scan finished');
+    } finally {
+      if (mounted) {
+        setState(() => _isScanningUploadedImage = false);
+        _log('Upload scan loading state cleared');
+      }
+    }
+  }
+
+  Future<String?> _decodeBarcodeFromUploadedImage(
+    PlatformFile file,
+    Uint8List bytes,
+  ) async {
+    if (kIsWeb) {
+      return decodeBarcodeFromImageBytes(
+        bytes,
+        mimeType: _mimeTypeFromFileName(file.name),
+      );
+    }
+
+    final path = file.path;
+    if (path == null || path.isEmpty) {
+      _log('Uploaded image path is null or empty');
+      return null;
+    }
+
+    try {
+      _log(
+        'Analyzing uploaded image path: $path, exists=${barcodePathExists(path)}',
+      );
+      final capture = await _scannerController.analyzeImage(path);
+      if (capture == null) {
+        _log('Capture result: NULL');
+        return null;
+      }
+
+      _log('Capture result: barcodes=${capture.barcodes.length}');
+
+      for (final barcode in capture.barcodes) {
+        final value = barcode.rawValue;
+        if (value != null && value.isNotEmpty) {
+          _log('Decoded barcode from image path: $value');
+          return value;
+        }
+      }
+
+      _log('Capture had no rawValue entries');
+    } catch (error) {
+      _log('Image analysis failed: $error');
+    }
+
+    return null;
+  }
+
+  String _mimeTypeFromFileName(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/png';
+  }
+
+  Widget _buildUploadedScanButton({
+    required bool loading,
+    required VoidCallback? onPressed,
+    required bool compact,
+  }) {
+    final button = OutlinedButton(
+      onPressed: loading ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size.fromHeight(compact ? 44 : 54),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        child: loading
+            ? SizedBox(
+                key: const ValueKey('upload-scan-loading'),
+                height: compact ? 28 : 40,
+                width: compact ? 28 : 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: compact ? 2.0 : 2.4,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              )
+            : Row(
+                key: const ValueKey('upload-scan-content'),
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: compact ? 16 : 26,
+                    height: compact ? 16 : 26,
+                    child: Lottie.asset(
+                      'assets/lottie/barcode.json',
+                      fit: BoxFit.contain,
+                      repeat: true,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Icon(
+                            Icons.qr_code_rounded,
+                            size: compact ? 15 : 18,
+                          ),
+                    ),
+                  ),
+                  SizedBox(width: compact ? 4 : 8),
+                  Text(
+                    'Scan',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: compact
+                        ? Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          )
+                        : null,
+                  ),
+                ],
+              ),
+      ),
+    );
+
+    return SizedBox(width: double.infinity, child: button);
+  }
+
+  Widget _buildUploadActions() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 420;
+
+        final uploadButton = CustomButton(
+          label: 'Upload Image',
+          iconAssetPath: 'assets/images/file.png',
+          variant: CustomButtonVariant.outline,
+          compact: isCompact,
+          loading: _isRequestingImagePermission,
+          onPressed: _pickBarcodeImage,
+        );
+
+        final scanButton = _buildUploadedScanButton(
+          loading: _isScanningUploadedImage,
+          compact: isCompact,
+          onPressed: _pickedImageFile == null ? null : _scanPickedBarcodeImage,
+        );
+
+        return Row(
+          children: [
+            Expanded(child: uploadButton),
+            SizedBox(width: isCompact ? 8 : 10),
+            Expanded(child: scanButton),
+          ],
+        );
+      },
     );
   }
 
@@ -200,19 +424,23 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   }
 
   void _handleBarcodeDetection(BarcodeCapture capture) {
+    _log('Camera detection callback fired with ${capture.barcodes.length} barcode(s)');
     String? code;
     for (final barcode in capture.barcodes) {
       final value = barcode.rawValue;
       if (value != null && value.isNotEmpty) {
         code = value;
+        _log('Detected camera barcode value: $value');
         break;
       }
     }
 
     if (code == null || !_isScanning) {
+      _log('Ignoring camera detection. code=$code, isScanning=$_isScanning');
       return;
     }
 
+    _log('Camera code accepted, stopping scanner and processing result');
     setState(() => _isScanning = false);
     unawaited(_scannerController.stop());
     _scanBarcode(code: code, source: 'Camera Scanner');
@@ -257,50 +485,31 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
 
   Map<String, String> _scanResultDetails({
     required ScanResultData result,
-    required String source,
   }) {
     return {
-      'Status': result.valid ? 'Valid' : 'Invalid',
-      'Source': source,
       'Unique Code': result.uniqueCode ?? '-',
       'Barcode Format': result.barcodeFormat ?? '-',
-      'Custom Label': result.customLabel ?? '-',
+      'Barcode Data': result.barcodeData ?? result.customLabel ?? '-',
+      'Public Link': result.publicLink ?? result.barcodeImageUrl ?? '-',
       'Product Name': result.productName ?? result.product?.name ?? '-',
       'Scanned At': _formatDateTime(result.scannedAt),
-      'Barcode Image URL': result.barcodeImageUrl ?? '-',
-      'SKU': result.product?.sku ?? '-',
-      'Brand': result.product?.brand ?? '-',
-      'Category': result.product?.category ?? '-',
-      'Unit': result.product?.unit ?? '-',
-      'Stock Quantity': result.product?.stockQuantity?.toString() ?? '-',
     };
   }
 
   Map<String, String> _historyDetails(MockScanHistoryItem item) {
     return {
-      'Status': item.isValid == null
-          ? '-'
-          : (item.isValid == true ? 'Valid' : 'Invalid'),
-      'Source': item.subtitle,
       'Unique Code': item.code,
       'Barcode Format': item.barcodeFormat ?? '-',
-      'Custom Label': item.customLabel ?? '-',
+      'Barcode Data': item.customLabel ?? '-',
+      'Public Link': item.barcodeImageUrl ?? '-',
       'Product Name': item.productName ?? '-',
-      'Scanned At': item.scannedAt == null
-          ? item.time
-          : _formatDateTime(item.scannedAt),
-      'Barcode Image URL': item.barcodeImageUrl ?? '-',
-      'Brand': item.brand ?? '-',
-      'Category': item.category ?? '-',
-      'Unit': item.unit ?? '-',
-      'Stock Quantity': item.stockQuantity?.toString() ?? '-',
+      'Scanned At': item.scannedAt == null ? item.time : _formatDateTime(item.scannedAt),
     };
   }
 
   Future<void> _showDetailsPopup({
     required String title,
     required String code,
-    required String source,
     required Map<String, String> details,
   }) {
     return showDialog<void>(
@@ -333,16 +542,6 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                         icon: const Icon(Icons.close_rounded),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    source,
-                    style: Theme.of(dialogContext).textTheme.bodySmall
-                        ?.copyWith(
-                          color: Theme.of(
-                            dialogContext,
-                          ).colorScheme.onSurfaceVariant,
-                        ),
                   ),
                   const SizedBox(height: 14),
                   Container(
@@ -417,12 +616,42 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
     String? imageName,
     required String source,
   }) async {
+    _log(
+      'API scan started. source=$source, code=${code ?? '-'}, imageName=${imageName ?? '-'}, imageBytes=${imageBytes?.length ?? 0}',
+    );
     try {
       final result = await ApiScope.of(context).scanBarcode(
         uniqueCode: code,
         barcodeImageBytes: imageBytes,
         barcodeImageName: imageName,
       );
+      final responseLog = {
+        'valid': result.valid,
+        'unique_code': result.uniqueCode,
+        'barcode_format': result.barcodeFormat,
+        'custom_label': result.customLabel,
+        'barcode_image_url': result.barcodeImageUrl,
+        'product_name': result.productName,
+        'scanned_at': result.scannedAt?.toIso8601String(),
+        'product': result.product == null
+            ? null
+            : {
+                'id': result.product!.id,
+                'name': result.product!.name,
+                'sku': result.product!.sku,
+                'description': result.product!.description,
+                'price': result.product!.price,
+                'brand': result.product!.brand,
+                'category': result.product!.category,
+                'unit': result.product!.unit,
+                'stock_quantity': result.product!.stockQuantity,
+                'raw': result.product!.raw,
+              },
+      };
+      _log(
+        'API scan success. valid=${result.valid}, uniqueCode=${result.uniqueCode ?? '-'}, format=${result.barcodeFormat ?? '-'}',
+      );
+      _log('API response: ${const JsonEncoder.withIndent('  ').convert(responseLog)}');
       if (!mounted) return;
 
       final resolvedCode =
@@ -441,16 +670,37 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
           return;
         }
 
+        _log('Opening scan result dialog');
         unawaited(
           _showDetailsPopup(
             title: 'Scan Result',
             code: resolvedCode,
-            source: source,
-            details: _scanResultDetails(result: result, source: source),
+            details: _scanResultDetails(result: result),
           ),
         );
       });
     } catch (error) {
+      if (error is ApiException) {
+        _log(
+          'API scan failed. statusCode=${error.statusCode}, message=${error.message}',
+        );
+        _log(
+          'API error payload: ${const JsonEncoder.withIndent('  ').convert({
+            'message': error.message,
+            'status_code': error.statusCode,
+            'validation_errors': error.validationErrors
+                ?.map(
+                  (item) => {
+                    'field': item.field,
+                    'messages': item.messages,
+                  },
+                )
+                .toList(),
+          })}',
+        );
+      } else {
+        _log('API scan failed: $error');
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -464,7 +714,6 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
     await _showDetailsPopup(
       title: 'Recent Scan',
       code: item.code,
-      source: item.subtitle,
       details: _historyDetails(item),
     );
   }
@@ -551,8 +800,11 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
   }
 
   void _manualSearch() {
+    _log('Manual search button clicked');
     final value = _manualController.text.trim();
+    _log('Manual barcode input value: "$value"');
     if (value.isEmpty) {
+      _log('Manual search aborted because input is empty');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Enter barcode data first'),
@@ -562,6 +814,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
       return;
     }
 
+    _log('Sending manual barcode to API');
     _scanBarcode(code: value, source: 'Manual Entry');
   }
 
@@ -653,13 +906,7 @@ class _LandingScannerScreenState extends State<LandingScannerScreen> {
                     onPressed: _isScanning ? _stopCameraScan : _startCameraScan,
                   ),
                   const SizedBox(height: 10),
-                  CustomButton(
-                    label: 'Upload Image to Scan',
-                    iconAssetPath: 'assets/images/file.png',
-                    variant: CustomButtonVariant.outline,
-                    loading: _isRequestingImagePermission,
-                    onPressed: _pickBarcodeImage,
-                  ),
+                  _buildUploadActions(),
                   if (_pickedImageName != null) ...[
                     const SizedBox(height: 10),
                     Text(

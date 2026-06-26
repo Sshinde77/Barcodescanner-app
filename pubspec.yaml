@@ -46,6 +46,8 @@ dependencies:
   shared_preferences: any
   shimmer: any
   flutter_launcher_icons: any
+  web: any
+  url_launcher: any
 
 dev_dependencies:
   flutter_test:

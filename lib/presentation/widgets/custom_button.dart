@@ -13,6 +13,7 @@ class CustomButton extends StatelessWidget {
     this.icon,
     this.iconAssetPath,
     this.iconColor,
+    this.compact = false,
     this.loading = false,
     this.fullWidth = true,
   });
@@ -23,6 +24,7 @@ class CustomButton extends StatelessWidget {
   final IconData? icon;
   final String? iconAssetPath;
   final Color? iconColor;
+  final bool compact;
   final bool loading;
   final bool fullWidth;
 
@@ -33,10 +35,10 @@ class CustomButton extends StatelessWidget {
       child: loading
           ? SizedBox(
               key: const ValueKey('loading'),
-              height: 40,
-              width: 40,
+              height: compact ? 28 : 40,
+              width: compact ? 28 : 40,
               child: CircularProgressIndicator(
-                strokeWidth: 2.4,
+                strokeWidth: compact ? 2.0 : 2.4,
                 color: variant == CustomButtonVariant.primary
                     ? Colors.white
                     : AppColors.primary,
@@ -48,25 +50,31 @@ class CustomButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 18),
-                  const SizedBox(width: 8),
+                  Icon(icon, size: compact ? 16 : 18),
+                  SizedBox(width: compact ? 6 : 8),
                 ] else if (iconAssetPath != null) ...[
                   SizedBox(
-                    width: 26,
-                    height: 26,
+                    width: compact ? 18 : 26,
+                    height: compact ? 18 : 26,
                     child: Image.asset(
                       iconAssetPath!,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: compact ? 6 : 8),
                 ],
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
+                  style: compact
+                      ? Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        )
+                      : null,
                 ),
               ],
             ),
@@ -78,9 +86,9 @@ class CustomButton extends StatelessWidget {
         button = ElevatedButton(
           onPressed: loading ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            minimumSize: const Size.fromHeight(54),
+            minimumSize: Size.fromHeight(compact ? 44 : 54),
+            padding: compact ? const EdgeInsets.symmetric(horizontal: 10) : EdgeInsets.zero,
             backgroundColor: null,
-            padding: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
@@ -91,7 +99,7 @@ class CustomButton extends StatelessWidget {
             ),
             child: Container(
               alignment: Alignment.center,
-              height: 54,
+              height: compact ? 44 : 54,
               child: child,
             ),
           ),
@@ -101,18 +109,28 @@ class CustomButton extends StatelessWidget {
         button = OutlinedButton(
           onPressed: loading ? null : onPressed,
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(54),
+            minimumSize: Size.fromHeight(compact ? 44 : 54),
+            padding: compact ? const EdgeInsets.symmetric(horizontal: 10) : null,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
           ),
-          child: SizedBox(height: 54, child: Center(child: child)),
+          child: SizedBox(
+            height: compact ? 44 : 54,
+            child: Center(child: child),
+          ),
         );
         break;
       case CustomButtonVariant.text:
         button = TextButton(
           onPressed: loading ? null : onPressed,
-          child: SizedBox(height: 54, child: Center(child: child)),
+          style: TextButton.styleFrom(
+            padding: compact ? const EdgeInsets.symmetric(horizontal: 10) : null,
+          ),
+          child: SizedBox(
+            height: compact ? 44 : 54,
+            child: Center(child: child),
+          ),
         );
         break;
     }

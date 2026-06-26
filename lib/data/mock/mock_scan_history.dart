@@ -10,6 +10,7 @@ class MockScanHistoryItem {
     this.customLabel,
     this.productName,
     this.barcodeImageUrl,
+    this.publicLink,
     this.scannedAt,
     this.brand,
     this.category,
@@ -27,6 +28,7 @@ class MockScanHistoryItem {
   final String? customLabel;
   final String? productName;
   final String? barcodeImageUrl;
+  final String? publicLink;
   final DateTime? scannedAt;
   final String? brand;
   final String? category;

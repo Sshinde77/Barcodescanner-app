@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../core/constants/api_constants.dart';
 import 'api_models.dart';
@@ -129,6 +130,20 @@ class ApiService {
     throw ApiException.fromResponse(response.statusCode, decoded);
   }
 
+  MediaType _imageContentType(String? filename) {
+    final lower = filename?.toLowerCase() ?? '';
+    if (lower.endsWith('.png')) {
+      return MediaType('image', 'png');
+    }
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return MediaType('image', 'jpeg');
+    }
+    if (lower.endsWith('.webp')) {
+      return MediaType('image', 'webp');
+    }
+    return MediaType('application', 'octet-stream');
+  }
+
   Future<AuthSession> register({
     required String name,
     required String email,
@@ -221,6 +236,7 @@ class ApiService {
                 'barcode_image',
                 barcodeImageBytes,
                 filename: barcodeImageName,
+                contentType: _imageContentType(barcodeImageName),
               ),
             ],
           )

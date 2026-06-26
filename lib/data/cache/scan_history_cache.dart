@@ -38,6 +38,7 @@ class ScanHistoryCache {
               customLabel: item['custom_label']?.toString(),
               productName: item['product_name']?.toString(),
               barcodeImageUrl: item['barcode_image_url']?.toString(),
+              publicLink: item['public_link']?.toString(),
               scannedAt: DateTime.tryParse(
                 item['scanned_at']?.toString() ?? '',
               ),
@@ -70,6 +71,7 @@ class ScanHistoryCache {
             'custom_label': item.customLabel,
             'product_name': item.productName,
             'barcode_image_url': item.barcodeImageUrl,
+            'public_link': item.publicLink,
             'scanned_at': item.scannedAt?.toIso8601String(),
             'brand': item.brand,
             'category': item.category,

@@ -137,7 +137,9 @@ class ScanResultData {
     required this.valid,
     required this.uniqueCode,
     required this.barcodeFormat,
+    required this.barcodeData,
     required this.customLabel,
+    required this.publicLink,
     required this.barcodeImageUrl,
     required this.productName,
     required this.product,
@@ -147,7 +149,9 @@ class ScanResultData {
   final bool valid;
   final String? uniqueCode;
   final String? barcodeFormat;
+  final String? barcodeData;
   final String? customLabel;
+  final String? publicLink;
   final String? barcodeImageUrl;
   final String? productName;
   final ScanProductSnapshot? product;
@@ -158,7 +162,12 @@ class ScanResultData {
       valid: json['valid'] == true,
       uniqueCode: json['unique_code']?.toString(),
       barcodeFormat: json['barcode_format']?.toString(),
+      barcodeData: json['barcode_data']?.toString(),
       customLabel: json['custom_label']?.toString(),
+      publicLink:
+          json['public_link']?.toString() ??
+          json['public_url']?.toString() ??
+          json['link']?.toString(),
       barcodeImageUrl: json['barcode_image_url']?.toString(),
       productName: json['product_name']?.toString(),
       product: json['product'] == null

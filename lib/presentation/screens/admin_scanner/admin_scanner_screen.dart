@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,9 @@ import '../../../data/api/api_models.dart';
 import '../../../data/api/api_provider.dart';
 import '../../../data/cache/scan_history_cache.dart';
 import '../../../data/mock/mock_scan_history.dart';
+import '../shared/barcode_image_decoder.dart';
+import '../shared/barcode_path_exists_stub.dart'
+    if (dart.library.io) '../shared/barcode_path_exists_io.dart';
 import '../../widgets/admin_shell.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
@@ -37,7 +41,9 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
   bool _isScanning = false;
   bool _isRequestingCameraPermission = false;
   bool _isRequestingImagePermission = false;
+  bool _isScanningUploadedImage = false;
   bool _loadingHistory = false;
+  PlatformFile? _pickedImageFile;
   String? _pickedImageName;
 
   @override
@@ -140,6 +146,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
     final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
+      withData: true,
     );
 
     if (!mounted) {
@@ -154,11 +161,203 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
     }
 
     final file = result.files.single;
-    setState(() => _pickedImageName = file.name);
+    setState(() {
+      _pickedImageFile = file;
+      _pickedImageName = file.name;
+    });
+  }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Selected image: ${file.name}')));
+  Future<void> _scanPickedBarcodeImage() async {
+    final file = _pickedImageFile;
+    if (file == null || file.name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick an image before scanning.')),
+      );
+      return;
+    }
+
+    final bytes = await file.xFile.readAsBytes();
+    final imageName = _pickedImageName ?? file.name;
+    final decodedCode = await _decodeBarcodeFromUploadedImage(file, bytes);
+    if (bytes.isEmpty || imageName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected image could not be read.')),
+      );
+      return;
+    }
+
+    if (decodedCode == null || decodedCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No barcode found in the uploaded image.')),
+      );
+      return;
+    }
+
+    setState(() => _isScanningUploadedImage = true);
+    try {
+      await _scanBarcode(
+        code: decodedCode,
+        imageBytes: bytes,
+        imageName: imageName,
+        source: 'Image Upload',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isScanningUploadedImage = false);
+      }
+    }
+  }
+
+  Future<String?> _decodeBarcodeFromUploadedImage(
+    PlatformFile file,
+    Uint8List bytes,
+  ) async {
+    if (kIsWeb) {
+      return decodeBarcodeFromImageBytes(
+        bytes,
+        mimeType: _mimeTypeFromFileName(file.name),
+      );
+    }
+
+    final path = file.path;
+    if (path == null || path.isEmpty) {
+      debugPrint('[AdminScanner] Uploaded image path is null or empty');
+      return null;
+    }
+
+    try {
+      debugPrint(
+        '[AdminScanner] Analyzing uploaded image path: $path, exists=${barcodePathExists(path)}',
+      );
+      final capture = await _scannerController.analyzeImage(path);
+      if (capture == null) {
+        debugPrint('[AdminScanner] Capture result: NULL');
+        return null;
+      }
+
+      debugPrint(
+        '[AdminScanner] Capture result: barcodes=${capture.barcodes.length}',
+      );
+
+      for (final barcode in capture.barcodes) {
+        final value = barcode.rawValue;
+        if (value != null && value.isNotEmpty) {
+          debugPrint('[AdminScanner] Decoded barcode from image path: $value');
+          return value;
+        }
+      }
+
+      debugPrint('[AdminScanner] Capture had no rawValue entries');
+    } catch (_) {
+      return null;
+    }
+
+    return null;
+  }
+
+  String _mimeTypeFromFileName(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/png';
+  }
+
+  Widget _buildUploadedScanButton({
+    required bool loading,
+    required VoidCallback? onPressed,
+    required bool compact,
+  }) {
+    final button = OutlinedButton(
+      onPressed: loading ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size.fromHeight(compact ? 44 : 54),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        child: loading
+            ? SizedBox(
+                key: const ValueKey('upload-scan-loading'),
+                height: compact ? 28 : 40,
+                width: compact ? 28 : 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: compact ? 2.0 : 2.4,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              )
+            : Row(
+                key: const ValueKey('upload-scan-content'),
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: compact ? 16 : 26,
+                    height: compact ? 16 : 26,
+                    child: Lottie.asset(
+                      'assets/lottie/barcode.json',
+                      fit: BoxFit.contain,
+                      repeat: true,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Icon(
+                            Icons.qr_code_rounded,
+                            size: compact ? 15 : 18,
+                          ),
+                    ),
+                  ),
+                  SizedBox(width: compact ? 4 : 8),
+                  Text(
+                    'Scan',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: compact
+                        ? Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          )
+                        : null,
+                  ),
+                ],
+              ),
+      ),
+    );
+
+    return SizedBox(width: double.infinity, child: button);
+  }
+
+  Widget _buildUploadActions() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 420;
+
+        final uploadButton = CustomButton(
+          label: 'Upload Image',
+          iconAssetPath: 'assets/images/file.png',
+          variant: CustomButtonVariant.outline,
+          compact: isCompact,
+          loading: _isRequestingImagePermission,
+          onPressed: _pickBarcodeImage,
+        );
+
+        final scanButton = _buildUploadedScanButton(
+          loading: _isScanningUploadedImage,
+          compact: isCompact,
+          onPressed: _pickedImageFile == null ? null : _scanPickedBarcodeImage,
+        );
+
+        return Row(
+          children: [
+            Expanded(child: uploadButton),
+            SizedBox(width: isCompact ? 8 : 10),
+            Expanded(child: scanButton),
+          ],
+        );
+      },
+    );
   }
 
   void _handleBarcodeDetection(BarcodeCapture capture) {
@@ -188,6 +387,37 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
       if (!mounted) return;
       _addHistoryItem(code: code, result: result, source: source);
       _showResult(code: result.uniqueCode ?? code, result: result);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _scanBarcode({
+    String? code,
+    Uint8List? imageBytes,
+    String? imageName,
+    required String source,
+  }) async {
+    try {
+      final result = await ApiScope.of(context).scanBarcode(
+        uniqueCode: code,
+        barcodeImageBytes: imageBytes,
+        barcodeImageName: imageName,
+      );
+      if (!mounted) return;
+
+      final resolvedCode = result.uniqueCode ?? code ?? imageName ?? 'Scanned Barcode';
+      _addHistoryItem(
+        code: resolvedCode,
+        result: result,
+        source: source,
+      );
+      _showResult(code: resolvedCode, result: result);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -235,40 +465,26 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
 
   Map<String, String> _scanResultDetails(ScanResultData result) {
     return {
-      'Status': result.valid ? 'Valid' : 'Invalid',
       'Unique Code': result.uniqueCode ?? '-',
       'Barcode Format': result.barcodeFormat ?? '-',
-      'Custom Label': result.customLabel ?? '-',
+      'Barcode Data': result.barcodeData ?? result.customLabel ?? '-',
+      'Public Link': result.publicLink ?? result.barcodeImageUrl ?? '-',
       'Product Name': result.productName ?? result.product?.name ?? '-',
       'Scanned At':
           result.scannedAt?.toLocal().toString().split('.').first ?? '-',
-      'Barcode Image URL': result.barcodeImageUrl ?? '-',
-      'SKU': result.product?.sku ?? '-',
-      'Brand': result.product?.brand ?? '-',
-      'Category': result.product?.category ?? '-',
-      'Unit': result.product?.unit ?? '-',
-      'Stock Quantity': result.product?.stockQuantity?.toString() ?? '-',
     };
   }
 
   Map<String, String> _historyDetails(MockScanHistoryItem item) {
     return {
-      'Status': item.isValid == null
-          ? '-'
-          : (item.isValid == true ? 'Valid' : 'Invalid'),
-      'Source': item.subtitle,
       'Unique Code': item.code,
       'Barcode Format': item.barcodeFormat ?? '-',
-      'Custom Label': item.customLabel ?? '-',
+      'Barcode Data': item.customLabel ?? '-',
+      'Public Link': item.barcodeImageUrl ?? '-',
       'Product Name': item.productName ?? '-',
       'Scanned At': item.scannedAt == null
           ? item.time
           : item.scannedAt!.toLocal().toString().split('.').first,
-      'Barcode Image URL': item.barcodeImageUrl ?? '-',
-      'Brand': item.brand ?? '-',
-      'Category': item.category ?? '-',
-      'Unit': item.unit ?? '-',
-      'Stock Quantity': item.stockQuantity?.toString() ?? '-',
     };
   }
 
@@ -303,7 +519,6 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
 
   Future<void> _showDetailsPopup({
     required String title,
-    required String source,
     required String code,
     required Map<String, String> details,
   }) {
@@ -332,13 +547,6 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                       icon: const Icon(Icons.close_rounded),
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  source,
-                  style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
-                  ),
                 ),
                 const SizedBox(height: 16),
                 Container(
@@ -412,7 +620,6 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
   }) {
     return _showDetailsPopup(
       title: 'Scan Result',
-      source: 'API result',
       code: code,
       details: _scanResultDetails(result),
     );
@@ -421,7 +628,6 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
   Future<void> _showHistoryDetails(MockScanHistoryItem item) {
     return _showDetailsPopup(
       title: 'Recent Scan',
-      source: item.subtitle,
       code: item.code,
       details: _historyDetails(item),
     );
@@ -589,13 +795,7 @@ class _AdminScannerScreenState extends State<AdminScannerScreen> {
                   onPressed: _isScanning ? _stopCameraScan : _startCameraScan,
                 ),
                 const SizedBox(height: 10),
-                CustomButton(
-                  label: 'Upload Image to Scan',
-                  iconAssetPath: 'assets/images/file.png',
-                  variant: CustomButtonVariant.outline,
-                  loading: _isRequestingImagePermission,
-                  onPressed: _pickBarcodeImage,
-                ),
+                _buildUploadActions(),
                 if (_pickedImageName != null) ...[
                   const SizedBox(height: 10),
                   Text(
